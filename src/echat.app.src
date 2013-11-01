@@ -1,0 +1,15 @@
+{
+    application,
+    echat,
+    [
+        {description, ""},
+        {vsn, "1"},
+        {registered, [echat_sup]},
+        {applications, [
+            kernel,
+            stdlib
+        ]},
+        {mod, {echat_app, []}},
+        {env, []}
+    ]
+}.
