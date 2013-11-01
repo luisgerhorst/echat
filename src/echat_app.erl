@@ -15,19 +15,22 @@ start(_StartType, _StartArgs) ->
     ok = application:start(cowboy),
     Dispatch = cowboy_router:compile([
         {'_', [
-            {"/_bullet", bullet_handler, [{handler, echat_stream_handler}]},
+            {"/bullet", bullet_handler, [{handler, echat_stream_handler}]},
+            {"/bullet.js", cowboy_static, [
+                {directory, {priv_dir, bullet, []}},
+                {file, "bullet.js"},
+                {mimetypes, [{<<".js">>, [<<"text/javascript">>]}]}
+            ]},
             {"/", cowboy_static, [
                 {directory, {priv_dir, echat, []}},
                 {file, "index.html"},
-                {mimetypes, [
-                        {<<".html">>, [<<"text/html">>]}
-                ]}
+                {mimetypes, [{<<".html">>, [<<"text/html">>]}]}
             ]},
             {"/[...]", cowboy_static, [
                 {directory, {priv_dir, echat, []}},
                 {mimetypes, [
-                        {<<".js">>, [<<"text/javascript">>]},
-                        {<<".css">>, [<<"text/css">>]}
+                    {<<".js">>, [<<"text/javascript">>]},
+                    {<<".css">>, [<<"text/css">>]}
                 ]}
             ]}
         ]}
