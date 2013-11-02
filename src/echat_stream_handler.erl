@@ -1,8 +1,6 @@
 -module(echat_stream_handler).
 -export([init/4, stream/3, info/3, terminate/2]).
 
-% todo: better event names
-
 % receive
 
 init(_Transport, Req, _Opts, _Active) ->
@@ -19,12 +17,12 @@ stream(Data, Req, State) ->
 	io:format("Unexpected data in stream: ~p~n", [Data]),
 	{ok, Req, State}.
 
-info({new_message, {Timestamp, Content, UserID, Username}}, Req, State) ->
-	res(<<"message">>, {[
+info({new_message, {Timestamp, Content, UserID, Nickname}}, Req, State) ->
+	res(<<"new_message">>, {[
 		{<<"timestamp">>, Timestamp},
 		{<<"content">>, Content},
 		{<<"userID">>, UserID},
-		{<<"username">>, Username}
+		{<<"nickname">>, Nickname}
 	]}, Req, State).
 
 terminate(_Req, _State) ->
@@ -33,21 +31,21 @@ terminate(_Req, _State) ->
 	
 % handle
 
-handle(<<"message">>, {[
+handle(<<"save_message">>, {[
 	{<<"content">>, Content},
 	{<<"userID">>, UserID},
-	{<<"username">>, Username}
-]}, Req, State) when is_binary(Content), is_integer(UserID), is_binary(Username) ->
-	echat_room:save_message(Content, UserID, Username),
+	{<<"nickname">>, Nickname}
+]}, Req, State) when is_binary(Content), is_integer(UserID), is_binary(Nickname) ->
+	echat_room:save_message(Content, UserID, Nickname),
 	res(none, Req, State);
-handle(<<"messages?">>, LatestMessageTimestamp, Req, State) when is_integer(LatestMessageTimestamp) ->
+handle(<<"get_messages_since">>, LatestMessageTimestamp, Req, State) when is_integer(LatestMessageTimestamp) ->
 	MessagesDiffEJSON = [ {[
 		{<<"timestamp">>, Timestamp},
 		{<<"content">>, Content},
 		{<<"userID">>, UserID},
-		{<<"username">>, Username}
-	]} || {Timestamp, Content, UserID, Username} <- echat_room:load_messages_since(LatestMessageTimestamp)],
-	res(<<"messages">>, MessagesDiffEJSON, Req, State);
+		{<<"nickname">>, Nickname}
+	]} || {Timestamp, Content, UserID, Nickname} <- echat_room:get_messages_since(LatestMessageTimestamp)],
+	res(<<"old_messages">>, MessagesDiffEJSON, Req, State);
 handle(Type, Data, Req, State) ->
 	io:format("Unexpected event ~p with data ~p~n", [Type, Data]),
 	res(none, Req, State).

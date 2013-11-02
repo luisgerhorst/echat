@@ -8,15 +8,7 @@ function start() {
 	
 	window.bullet.onopen = function () {
 		var latestMessageTimestamp = (window.messages.length > 0) ? window.messages[window.messages.length-1].timestamp : -1;
-		send('messages?', latestMessageTimestamp); // ask for new messages since disconnect
-	};
-	
-	window.bullet.ondisconnect = function () {
-		console.log('bullet: disconnected');
-	};
-	
-	window.bullet.onclose = function () {
-		console.log('bullet: closed');
+		send('get_messages_since', latestMessageTimestamp); // ask for new messages since disconnect
 	};
 	
 	window.bullet.onmessage = function (event) {
@@ -29,14 +21,6 @@ function start() {
 		}
 	};
 	
-	window.bullet.onheartbeat = function () {
-		
-	};
-	
-}
-
-function test() {
-	sendMessage('jo');
 }
 
 // data
@@ -45,8 +29,8 @@ window.messages = [];
 
 window.userID = (new Date()).getTime();
 
-function setUsername(username) {
-	window.username = username;
+function setNickname(nickname) {
+	window.nickname = nickname;
 }
 
 function appendMessages(messages) {
@@ -56,7 +40,7 @@ function appendMessages(messages) {
 
 // actions
 
-function send(type, data) { // type: string
+function send(type, data) {
 	var json = JSON.stringify({
 		type: type,
 		data: data
@@ -68,22 +52,23 @@ function send(type, data) { // type: string
 // actions - shorthands
 
 function sendMessage(content) {
-	send('message', {
+	if (!window.nickname) throw 'no_nickname_set';
+	send('save_message', {
 		content: content,
 		userID: window.userID,
-		username: (window.username) ? window.username : 'Unknown'
+		nickname: window.nickname
 	});
 }
 
 // reactions
 
-function handle(type, data) { // type: string
+function handle(type, data) {
 	switch (type) {
-		case 'messages':
+		case 'old_messages':
 			// data is array of extended message objects, newest first
 			appendMessages(data.reverse());
 			break;
-		case 'message':
+		case 'new_message':
 			// data is single extended message object
 			appendMessages([data]);
 			break;

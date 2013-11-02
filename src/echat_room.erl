@@ -1,7 +1,7 @@
 -module(echat_room).
 -behaviour(gen_server).
 
--export([start_link/0, save_message/3, load_messages_since/1, subscribe/0, unsubscribe/0]).
+-export([start_link/0, save_message/3, get_messages_since/1, subscribe/0, unsubscribe/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 % api
@@ -11,11 +11,11 @@ start_link() ->
 	register(echat_room, Pid),
 	{ok, Pid}.
 
-save_message(Content, UserID, Username) ->
-	gen_server:cast(whereis(echat_room), {save_message, Content, UserID, Username}).
+save_message(Content, UserID, Nickname) ->
+	gen_server:cast(whereis(echat_room), {save_message, Content, UserID, Nickname}).
 
-load_messages_since(Timestamp) ->
-	gen_server:call(whereis(echat_room), {load_messages_since, Timestamp}).
+get_messages_since(Timestamp) ->
+	gen_server:call(whereis(echat_room), {get_messages_since, Timestamp}).
 	
 subscribe() ->
 	gen_server:cast(whereis(echat_room), {subscribe, self()}).
@@ -54,15 +54,15 @@ init([]) ->
 	{ok, _} = cowboy:start_http(http, 100, [{port, 8080}], [{env, [{dispatch, Dispatch}]}]),
 	{ok, {[], []}}.
 
-handle_call({load_messages_since, LatestMessageTimestamp}, _From, {Subscribers,Messages}) ->
-	MessagesDiff = [{Timestamp, Content, UserID, Username} || {Timestamp, Content, UserID, Username} <- Messages, LatestMessageTimestamp < Timestamp],
+handle_call({get_messages_since, LatestMessageTimestamp}, _From, {Subscribers,Messages}) ->
+	MessagesDiff = [{Timestamp, Content, UserID, Nickname} || {Timestamp, Content, UserID, Nickname} <- Messages, LatestMessageTimestamp < Timestamp],
 	{reply, MessagesDiff, {Subscribers, Messages}};
 handle_call(Msg, _From, State) ->
 	io:format("Unexpected call to echat_room ~p~n", [Msg]),
 	{noreply, State}.
 	
-handle_cast({save_message, Content, UserID, Username}, {Subscribers, Messages}) ->
-	NewMessage = {timestamp(), Content, UserID, Username},
+handle_cast({save_message, Content, UserID, Nickname}, {Subscribers, Messages}) ->
+	NewMessage = {timestamp(), Content, UserID, Nickname},
 	[Subscriber ! {new_message, NewMessage} || Subscriber <- Subscribers],
 	{noreply, {Subscribers, [NewMessage|Messages]}};
 handle_cast({subscribe, Pid}, {Subscribers, Messages}) ->
