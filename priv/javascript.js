@@ -7,8 +7,8 @@ function start() {
 	// reactions
 	
 	window.bullet.onopen = function () {
-		console.log('bullet: opened');
-		test(); // disable for production
+		var latestMessageTimestamp = (window.messages.length > 0) ? window.messages[window.messages.length-1].timestamp : -1;
+		send('messages?', latestMessageTimestamp); // ask for new messages since disconnect
 	};
 	
 	window.bullet.ondisconnect = function () {
@@ -21,24 +21,16 @@ function start() {
 	
 	window.bullet.onmessage = function (event) {
 		try {
-			console.log(event.data);
-			var array = JSON.parse(event.data);
-			var type = array.shift();
-			var data = array;
-			handle(type, data);
+			// console.log('received', event.data);
+			var object = JSON.parse(event.data);
+			handle(object.type, object.data);
 		} catch (error) {
-			console.log('Error', error, 'handling message event', event);
+			console.log('Invalid message', event.data, 'caused error', error);
 		}
 	};
 	
 	window.bullet.onheartbeat = function () {
-		try {
-			console.log('i have', window.messages);
-			var latestMessageTimestamp = window.messages[window.messages.length-1][0];
-		} catch (error) {
-			var latestMessageTimestamp = -1;
-		}
-		send('update?', [latestMessageTimestamp]);
+		
 	};
 	
 }
@@ -59,34 +51,41 @@ function setUsername(username) {
 
 function appendMessages(messages) {
 	window.messages.push.apply(window.messages, messages);
-	console.log('appended', messages, 'now i have', window.messages);
+	console.log('received messages', messages);
 }
 
 // actions
 
-function send(type, data) { // type: string, data: array
-	data.unshift(type);
-	var string = JSON.stringify(data);
-	console.log('sending', data);
-	window.bullet.send(string);
+function send(type, data) { // type: string
+	var json = JSON.stringify({
+		type: type,
+		data: data
+	});
+	// console.log('sending', json);
+	window.bullet.send(json);
 }
 
 // actions - shorthands
 
 function sendMessage(content) {
-	send('message', [
-		content,
-		window.userID,
-		window.username ? window.username : 'Unknown'
-	]);
+	send('message', {
+		content: content,
+		userID: window.userID,
+		username: (window.username) ? window.username : 'Unknown'
+	});
 }
 
 // reactions
 
-function handle(type, data) {
+function handle(type, data) { // type: string
 	switch (type) {
 		case 'messages':
+			// data is array of extended message objects, newest first
 			appendMessages(data.reverse());
+			break;
+		case 'message':
+			// data is single extended message object
+			appendMessages([data]);
 			break;
 		default:
 			throw 'Unexpected type';

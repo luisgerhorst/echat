@@ -24,5 +24,14 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, []} }.
+    {ok, { {one_for_one, 1, 1}, [
+        {
+            room,
+            {echat_room, start_link, []},
+            permanent,
+            1000,
+            worker,
+            [echat_room]
+        }
+    ]} }.
 

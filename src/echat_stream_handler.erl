@@ -1,49 +1,64 @@
 -module(echat_stream_handler).
 -export([init/4, stream/3, info/3, terminate/2]).
 
+% todo: better event names
+
 % receive
 
 init(_Transport, Req, _Opts, _Active) ->
-	io:format("bullet init~n"),
-	{ok, Req, []}.
+	echat_room:subscribe(),
+	{ok, Req, undefined}.
 
-stream(EncodedData, Req, Messages) ->
-	[Type|Data] = jiffy:decode(EncodedData), % catch error here!
-	handle(Type, Data, Req, Messages);
-stream(Data, Req, Messages) ->
+stream(EncodedData, Req, State) ->
+	{[
+		{<<"type">>, Type},
+		{<<"data">>, Data}
+	]} = jiffy:decode(EncodedData), % catch error here!
+	handle(Type, Data, Req, State);
+stream(Data, Req, State) ->
 	io:format("Unexpected data in stream: ~p~n", [Data]),
-	{ok, Req, Messages}.
+	{ok, Req, State}.
 
-info(Info, Req, Messages) ->
-	io:format("info received ~p~n", [Info]),
-	{ok, Req, Messages}.
+info({new_message, {Timestamp, Content, UserID, Username}}, Req, State) ->
+	res(<<"message">>, {[
+		{<<"timestamp">>, Timestamp},
+		{<<"content">>, Content},
+		{<<"userID">>, UserID},
+		{<<"username">>, Username}
+	]}, Req, State).
 
-terminate(_Req, _Messages) ->
-	io:format("bullet terminate~n"),
+terminate(_Req, _State) ->
+	echat_room:unsubscribe(),
 	ok.
 	
 % handle
 
-handle(<<"message">>, [Content, UserID, Username], Req, Messages) when is_binary(Content), is_integer(UserID), is_binary(Username) ->
-	NewMessages = [{timestamp(), Content, UserID, Username}|Messages],
-	res(none, Req, NewMessages);
-handle(<<"update?">>, [LatestMessageTimestamp], Req, Messages) when is_integer(LatestMessageTimestamp) ->
-	MessagesDiff = [[Timestamp, Content, UserID, Username] || {Timestamp, Content, UserID, Username} <- Messages, LatestMessageTimestamp < Timestamp], % when newer/bigger timestamp take over and convert tuple to list
-	res(<<"messages">>, MessagesDiff, Req, Messages);
-handle(Type, Data, Req, Messages) ->
+handle(<<"message">>, {[
+	{<<"content">>, Content},
+	{<<"userID">>, UserID},
+	{<<"username">>, Username}
+]}, Req, State) when is_binary(Content), is_integer(UserID), is_binary(Username) ->
+	echat_room:save_message(Content, UserID, Username),
+	res(none, Req, State);
+handle(<<"messages?">>, LatestMessageTimestamp, Req, State) when is_integer(LatestMessageTimestamp) ->
+	MessagesDiffEJSON = [ {[
+		{<<"timestamp">>, Timestamp},
+		{<<"content">>, Content},
+		{<<"userID">>, UserID},
+		{<<"username">>, Username}
+	]} || {Timestamp, Content, UserID, Username} <- echat_room:load_messages_since(LatestMessageTimestamp)],
+	res(<<"messages">>, MessagesDiffEJSON, Req, State);
+handle(Type, Data, Req, State) ->
 	io:format("Unexpected event ~p with data ~p~n", [Type, Data]),
-	res(none, Req, Messages).
+	res(none, Req, State).
 	
 % response
 
 res(none, Req, Messages) -> {ok, Req, Messages}.
 
 res(Type, Data, Req, Messages) ->
-	Res = jiffy:encode([Type|Data]),
+	Res = jiffy:encode( {[
+		{<<"type">>, Type},
+		{<<"data">>, Data}
+	]} ),
 	{reply, Res, Req, Messages}.
-	
-% tools
-
-timestamp() ->
-	{Mega, Sec, Micro} = now(),
-	Timestamp = Mega * 1000000 * 1000000 + Sec * 1000000 + Micro.
