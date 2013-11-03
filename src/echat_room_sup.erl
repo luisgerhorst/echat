@@ -1,5 +1,5 @@
 
--module(echat_sup).
+-module(echat_room_sup).
 
 -behaviour(supervisor).
 
@@ -17,7 +17,7 @@
 %% ===================================================================
 
 start_link() ->
-    io:format("starting supervisor~n"),
+    io:format("starting room sup"),
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 %% ===================================================================
@@ -25,15 +25,5 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    io:format("starting supervisor step 2~n"),
-    {ok, {{one_for_one, 1, 1}, [
-        {
-            room_manager,
-            {echat_room_manager, start_link, [self()]},
-            permanent,
-            1000,
-            worker,
-            [echat_room_manager]
-        }
-    ]}}.
+    {ok, {{one_for_one, 1, 1}, []}}.
 

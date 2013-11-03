@@ -10,6 +10,32 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
+    ok = application:start(crypto),
+    ok = application:start(ranch),
+    ok = application:start(cowboy),
+    Dispatch = cowboy_router:compile([
+        {'_', [
+            {"/bullet", bullet_handler, [{handler, echat_stream_handler}]},
+            {"/bullet.js", cowboy_static, [
+                {directory, {priv_dir, bullet, []}},
+                {file, "bullet.js"},
+                {mimetypes, [{<<".js">>, [<<"text/javascript">>]}]}
+            ]},
+            {"/", cowboy_static, [
+                {directory, {priv_dir, echat, []}},
+                {file, "index.html"},
+                {mimetypes, [{<<".html">>, [<<"text/html">>]}]}
+            ]},
+            {"/[...]", cowboy_static, [
+                {directory, {priv_dir, echat, []}},
+                {mimetypes, [
+                    {<<".js">>, [<<"text/javascript">>]},
+                    {<<".css">>, [<<"text/css">>]}
+                ]}
+            ]}
+        ]}
+    ]),
+    {ok, _} = cowboy:start_http(http, 100, [{port, 8080}], [{env, [{dispatch, Dispatch}]}]),
     echat_sup:start_link(). % start manager, do stuff above in manager and send manager's pid to each handler's init
 
 stop(_State) ->

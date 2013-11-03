@@ -7,35 +7,28 @@ function start() {
 	// reactions
 	
 	window.bullet.onopen = function () {
-		var latestMessageTimestamp = (window.messages.length > 0) ? window.messages[window.messages.length-1].timestamp : -1;
-		send('get_messages_since', latestMessageTimestamp); // ask for new messages since disconnect
+		console.log('bullet: opened');
+		if (window.user) window.user.reconnect();
 	};
 	
 	window.bullet.onmessage = function (event) {
 		try {
-			// console.log('received', event.data);
+			console.log('received', event.data);
 			var object = JSON.parse(event.data);
 			handle(object.type, object.data);
 		} catch (error) {
-			console.log('Invalid message', event.data, 'caused error', error);
+			console.log('Unable to handle invalid message', event.data, 'error', error);
 		}
 	};
 	
-}
-
-// data
-
-window.messages = [];
-
-window.userID = (new Date()).getTime();
-
-function setNickname(nickname) {
-	window.nickname = nickname;
-}
-
-function appendMessages(messages) {
-	window.messages.push.apply(window.messages, messages);
-	console.log('received messages', messages);
+	bullet.ondisconnect = function(){
+		console.log('bullet: disconnected');
+	};
+	
+	bullet.onclose = function(){
+		console.log('bullet: closed');
+	};
+	
 }
 
 // actions
@@ -45,18 +38,30 @@ function send(type, data) {
 		type: type,
 		data: data
 	});
-	// console.log('sending', json);
+	console.log('sending', json);
 	window.bullet.send(json);
 }
 
-// actions - shorthands
+function sendUser(id, nickname, rooms) {
+	send('user', {
+		id: id,
+		nickname: nickname,
+		rooms: rooms
+	});
+}
 
-function sendMessage(content) {
-	if (!window.nickname) throw 'no_nickname_set';
-	send('save_message', {
-		content: content,
-		userID: window.userID,
-		nickname: window.nickname
+function sendJoin(room) {
+	send('join', room);
+}
+
+function sendLeave(room) {
+	send('leave', room);
+}
+
+function sendMessage(room, content) {
+	send('message', {
+		room: room,
+		content: content
 	});
 }
 
@@ -65,14 +70,76 @@ function sendMessage(content) {
 function handle(type, data) {
 	switch (type) {
 		case 'old_messages':
-			// data is array of extended message objects, newest first
-			appendMessages(data.reverse());
+			for (var i = data.length; i--;) {
+				var name = data[i].room;
+				var messages = data[i].messages;
+				window.user.rooms[name].appendMessages(messages.reverse());
+			}
 			break;
 		case 'new_message':
 			// data is single extended message object
-			appendMessages([data]);
+			window.user.rooms[data.room].appendMessages([data.message]);
 			break;
 		default:
 			throw 'Unexpected type';
 	}
+}
+
+// data
+
+function enter(nickname) {
+	window.user = new User(nickname);
+	sendUser(window.user.id, window.user.nickname, []);
+}
+
+function User(nickname) {
+	
+	this.id = (new Date()).getTime();
+	this.nickname = nickname;
+	
+	this.rooms = {};
+	
+	this.join = function (roomName) {
+		sendJoin(roomName);
+		this.rooms[roomName] = new Room(roomName);
+	}
+	
+	this.leave = function (roomName) {
+		sendLeave(roomName);
+		this.rooms[roomName] = null;
+	}
+	
+	this.reconnect = function () {
+		var roomInfos = [];
+		for (var name in this.rooms) {
+			var room = this.rooms[name];
+			roomInfos.push({ 
+				name: room.name,
+				latest: room.latestMessageTimestamp()
+			});
+		}
+		sendUser(this.id, this.nickname, roomInfos);
+	}
+	
+}
+
+function Room(name) {
+	
+	this.name = name;
+	
+	this.messages = [];
+	
+	this.latestMessageTimestamp = function () {
+		return (this.messages.length > 0) ? this.messages[this.messages.length-1].timestamp : -1;
+	};
+	
+	this.appendMessages = function (messages) { // insert messages ordered
+		this.messages.push.apply(this.messages, messages);
+		console.log('room', this.name, 'received messages', messages);
+	};
+	
+	this.sendMessage = function (content) {
+		sendMessage(this.name, content);
+	};
+	
 }
