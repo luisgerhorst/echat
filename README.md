@@ -19,8 +19,8 @@ You can define a handler for new messages with `chat.onmessages(roomName, messag
 
 ```javascript
 {
-	content: 'Your Message',
-	nickname: 'Sender Name',
+	content: 'Message',
+	nickname: 'Name',
 	timestamp: 1383581585254873,
 	userID: 1383581552494
 }
