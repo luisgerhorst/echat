@@ -15,7 +15,7 @@ The client side is kind of framework, would be great if someone would build an i
 
 3. After having joined a room use `chat.room('Room Name').send('Your Message');` to send a message into a room.
 
-You can define a handler for new messages with `chat.onmessages(roomName, messagesArray)`. `messagesArray` is an array of messages such as 
+You can define a handler for new messages with `chat.onmessages(function (roomName, messagesArray) { /* handle new messages here */ });`. `messagesArray` is an array of messages such as
 
 ```javascript
 {

@@ -122,7 +122,9 @@ function User(nickname) {
 		sendUser(this.id, this.nickname, roomInfos);
 	}
 	
-	this.onmessages = null;
+	this.onmessages = function (Func) {
+		this.onmessagesCallback = Func;
+	};
 	
 }
 
@@ -130,16 +132,16 @@ function Room(name) {
 	
 	this.name = name;
 	
-	//this.messages = [];
+	// this.messages = [];
 	
 	this.latestMessageTimestamp = function () {
 		return (this.messages.length > 0) ? this.messages[this.messages.length-1].timestamp : -1;
 	};
 	
 	this.append = function (messages) {
-		//this.messages.push.apply(this.messages, messages);
+		// this.messages.push.apply(this.messages, messages);
 		console.log('Room "'+this.name+'" received messages', messages);
-		if (window.chat.onmessage) window.chat.onmessages(this.name, messages);
+		if (window.chat.onmessagesCallback) window.chat.onmessagesCallback(this.name, messages);
 	};
 	
 	this.send = function (content) {
