@@ -1,44 +1,51 @@
 -module(echat_room).
 -behaviour(gen_server).
 
--export([start_link/1, save_message/4, get_messages_since/2, subscribe/1, unsubscribe/1]).
+-export([start_link/1, save_message/4, messages_since/2, subscribe/1, unsubscribe/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+
+-define(MESSAGESLIMIT, 100).
 
 % api
 
 start_link(RoomName) ->
 	gen_server:start_link(?MODULE, [RoomName], [{debug, [log]}]).
 
-save_message(Name, Content, UserID, Nickname) ->
-	gen_server:cast(echat_room_manager:get_pid(Name), {save_message, Content, UserID, Nickname}).
+save_message(RoomName, UserID, Nickname, Content) ->
+	gen_server:cast(echat_room_manager:get_pid(RoomName), {save_message, UserID, Nickname, Content}).
 
-get_messages_since(Name, Timestamp) ->
-	gen_server:call(echat_room_manager:get_pid(Name), {get_messages_since, Timestamp}).
+messages_since(RoomName, Timestamp) ->
+	gen_server:call(echat_room_manager:get_pid(RoomName), {messages_since, Timestamp}).
 	
-subscribe(Name) ->
-	gen_server:cast(echat_room_manager:get_pid(Name), {subscribe, self()}).
+subscribe(RoomName) ->
+	gen_server:cast(echat_room_manager:get_pid(RoomName), {subscribe, self()}).
 	
-unsubscribe(Name) ->
-	gen_server:cast(echat_room_manager:get_pid(Name), {unsubscribe, self()}).
+unsubscribe(RoomName) ->
+	gen_server:cast(echat_room_manager:get_pid(RoomName), {unsubscribe, self()}).
 	
 % gen_server
 
 init([RoomName]) ->
 	{ok, {RoomName, [], []}}.
 
-handle_call({get_messages_since, LatestMessageTimestamp}, _From, {RoomName, Subscribers,Messages}) ->
-	MessagesDiff = [{Timestamp, Content, UserID, Nickname} || {Timestamp, Content, UserID, Nickname} <- Messages, LatestMessageTimestamp < Timestamp],
-	{reply, MessagesDiff, {RoomName, Subscribers, Messages}};
+handle_call({messages_since, LatestTimestamp}, _From, {RoomName, ConnectionPids, Messages}) ->
+	LimitedMessages = lists:sublist(Messages, 1, ?MESSAGESLIMIT),
+	LimitedMessagesDiff = [{UserID, Nickname, Timestamp, Content} || {UserID, Nickname, Timestamp, Content} <- LimitedMessages, LatestTimestamp < Timestamp],
+	{reply, LimitedMessagesDiff, {RoomName, ConnectionPids, Messages}};
 handle_call(Msg, _From, State) -> io:format("Unexpected call to echat_room ~p~n", [Msg]), {noreply, State}.
 	
-handle_cast({save_message, Content, UserID, Nickname}, {RoomName, Subscribers, Messages}) ->
-	NewMessage = {timestamp(), Content, UserID, Nickname},
-	[Subscriber ! {new_message, RoomName, timestamp(), Content, UserID, Nickname} || Subscriber <- Subscribers],
-	{noreply, {RoomName, Subscribers, [NewMessage|Messages]}};
-handle_cast({subscribe, Pid}, {RoomName, Subscribers, Messages}) ->
-	{noreply, {RoomName, [Pid|Subscribers], Messages}};
-handle_cast({unsubscribe, Pid}, {RoomName, Subscribers, Messages}) ->
-	{noreply, {RoomName, lists:delete(Pid, Subscribers), Messages}}; % stop or hibernate if no more subscribers
+handle_cast({save_message, UserID, Nickname, Content}, {RoomName, ConnectionPids, Messages}) ->
+	NewMessage = {UserID, Nickname, timestamp(), Content},
+	[echat_stream_handler:new_message(ConnectionPid, RoomName, NewMessage) || ConnectionPid <- ConnectionPids],
+	{noreply, {
+		RoomName,
+		ConnectionPids,
+		[NewMessage|Messages]
+	}};
+handle_cast({subscribe, ConnectionPid}, {RoomName, ConnectionPids, Messages}) ->
+	{noreply, {RoomName, [ConnectionPid|ConnectionPids], Messages}};
+handle_cast({unsubscribe, ConnectionPid}, {RoomName, ConnectionPids, Messages}) ->
+	{noreply, {RoomName, lists:delete(ConnectionPid, ConnectionPids), Messages}}; % stop or hibernate if no more subscribers
 handle_cast(Msg, State) -> io:format("Unexpected cast to echat_room ~p~n", [Msg]), {noreply, State}.
 	
 handle_info(Msg, State) -> io:format("Unexpected message to echat_room ~p~n", [Msg]), {noreply, State}.

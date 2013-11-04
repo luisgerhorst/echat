@@ -53,7 +53,7 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 get_pid(SearchedName, RoomSup) ->
 	Rooms = supervisor:which_children(RoomSup),
 	FoundPid = lists:foldl(fun ({{room, Name}, Pid, _Type, _CallbackMod}, Contains) -> 
-		NewContains = if
+		if
 			Name =:= SearchedName -> Pid;
 			true -> Contains
 		end

@@ -1,5 +1,7 @@
 -module(echat_app).
 
+-define(PORT, 8080). % the port, you can change this!
+
 -behaviour(application).
 
 %% Application callbacks
@@ -35,7 +37,7 @@ start(_StartType, _StartArgs) ->
             ]}
         ]}
     ]),
-    {ok, _} = cowboy:start_http(http, 100, [{port, 8080}], [{env, [{dispatch, Dispatch}]}]),
+    {ok, _} = cowboy:start_http(http, 100, [{port, ?PORT}], [{env, [{dispatch, Dispatch}]}]),
     echat_sup:start_link(). % start manager, do stuff above in manager and send manager's pid to each handler's init
 
 stop(_State) ->
