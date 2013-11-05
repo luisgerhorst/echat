@@ -7,8 +7,8 @@
 % api
 
 start_link(Sup) ->
-	io:format("starting manager sup is ~p~n", [Sup]),
-	{ok, Pid} = gen_server:start_link(?MODULE, [], [{debug, [log]}]),
+	io:format("starting manager, sup is ~p~n", [Sup]),
+	{ok, Pid} = gen_server:start_link(?MODULE, [], []),
 	io:format("got manager pid ~p~n", [Pid]),
 	gen_server:cast(Pid, {start_room_sup, Sup}),
 	register(echat_room_manager, Pid),
@@ -40,6 +40,7 @@ handle_cast({start_room_sup, Sup}, undefined) ->
 		[echat_room_sup]
 	}),
 	{noreply, RoomSup};
+% todo: stop room here?
 handle_cast(Msg, State) -> io:format("Unexpected cast to echat_room_manager ~p~n", [Msg]), {noreply, State}.
 
 handle_info(Msg, State) -> io:format("Unexpected message to echat_room_manager ~p~n", [Msg]), {noreply, State}.
@@ -52,15 +53,19 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 get_pid(SearchedName, RoomSup) ->
 	Rooms = supervisor:which_children(RoomSup),
-	FoundPid = lists:foldl(fun ({{room, Name}, Pid, _Type, _CallbackMod}, Contains) -> 
+	FoundPid = lists:foldl(fun ({{room, Name}, Pid, _Type, _CallbackMod}, Contains) ->
 		if
 			Name =:= SearchedName -> Pid;
 			true -> Contains
 		end
 	end, false, Rooms),
 	case FoundPid of
-		FoundPid when is_pid(FoundPid) -> FoundPid;
-		FoundPid ->
+		FoundPid when is_pid(FoundPid) -> % exists
+			FoundPid;
+		undefined -> % has already existed but was terminated
+			supervisor:restart_child(echat_rooms, {room, SearchedName}).
+		FoundPid -> % never existed
+			io:format("no process for room ~p found in sup children ~p (just found ~p)~n", [SearchedName, Rooms, FoundPid]),
 			{ok, CreatedPid} = supervisor:start_child(RoomSup, {
 				{room, SearchedName},
 				{echat_room, start_link, [SearchedName]},

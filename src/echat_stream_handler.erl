@@ -47,11 +47,16 @@ info(Msg, Req, State) ->
 	{ok, Req, State}.
 
 terminate(_Req, {_UserID, _Nickname, RoomNames}) when is_list(RoomNames) ->
+	io:format("Controlled handler disconnect, unsubscribing from rooms ~p ~n", [RoomNames]),
 	lists:map(fun echat_room:unsubscribe/1, RoomNames),
 	ok;
-terminate(_Req, _User) -> ok.
+terminate(Req, User) ->
+	io:format("Uncontrolled handler terminate, Req ~p user is ~p~n", [Req, User]),
+	ok.
 	
 % handle
+
+% todo: user record instead of tuple
 
 handle(<<"user">>, {[
 	{<<"id">>, UserID},
@@ -69,13 +74,13 @@ handle(<<"user">>, {[
 			extract_room_names(RoomsInfo)
 		}
 	);
-handle(<<"join">>, RoomName, Req, User) when is_binary(RoomName) ->
+handle(<<"join">>, RoomName, Req, {UserID, Nickname, RoomNames}) when is_binary(RoomName) ->
 	echat_room:subscribe(RoomName),
 	res(
 		<<"room_old_messages">>,
 		join_res(RoomName),
 		Req,
-		User
+		{UserID, Nickname, [RoomName|RoomNames]}
 	);
 handle(<<"leave">>, RoomName, Req, User) when is_binary(RoomName) ->
 	echat_room:unsubscribe(RoomName),

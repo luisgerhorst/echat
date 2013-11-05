@@ -18,7 +18,7 @@
 
 start_link() ->
     io:format("starting room sup"),
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    supervisor:start_link(echat_rooms, ?MODULE, []).
 
 %% ===================================================================
 %% Supervisor callbacks
