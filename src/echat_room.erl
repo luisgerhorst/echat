@@ -39,7 +39,7 @@ unsubscribe(RoomName) ->
 % gen_server
 
 init([RoomName]) ->
-	io:format("i would read the messages from mnesia now~n"),
+	io:format("Starting room ~p~n", [RoomName]),
 	% read messages from mnesia
 	{ok, #state{room_name=RoomName}}.
 
@@ -118,15 +118,10 @@ handle_cast(Msg, State) -> io:format("Unexpected cast to echat_room ~p~n", [Msg]
 handle_info(Msg, State) -> io:format("Unexpected message to echat_room ~p~n", [Msg]), {noreply, State}.
 
 terminate(normal, {no_subscribers, RoomName, _Messages}) ->
-	io:format("if i wouldn't be that lazy i would save the messages into mnesia now :D~n"),
-	% save to mnesia
-	io:format("-> stopping process for room ~p~n", [RoomName]),
+	io:format("Room with name ~p terminated because of no subscribers.~n", [RoomName]),
 	ok;
 terminate(_Other, State) ->
-	% save to mnesia
-	io:format("unwanted room termination~n"),
-	% log
-	io:format("-> stopping process for room with State~p~n", [State]),
+	io:format("Error: Room with state ~p and pid ~p terminated.~n", [State, self()]),
 	ok.
 	
 code_change(_OldVsn, State, _Extra) -> {ok, State}.

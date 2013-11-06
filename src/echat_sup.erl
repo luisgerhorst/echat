@@ -17,7 +17,7 @@
 %% ===================================================================
 
 start_link() ->
-    io:format("starting supervisor~n"),
+    io:format("Starting supervisor.~n"),
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 %% ===================================================================
@@ -25,7 +25,6 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    io:format("starting supervisor step 2~n"),
     {ok, {{one_for_one, 1, 1}, [
         {
             room_manager,

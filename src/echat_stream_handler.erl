@@ -11,7 +11,7 @@ new_message(ConnectionPid, RoomName, Message) ->
 % receive
 
 init(_Transport, Req, _Opts, _Active) ->
-	io:format("new connection~n"),
+	io:format("! New connection ~p~n", [self()]),
 	{ok, Req, undefined}. % State: {UserID, Nickname, Rooms}
 
 stream(EncodedData, Req, User) ->
@@ -47,11 +47,11 @@ info(Msg, Req, State) ->
 	{ok, Req, State}.
 
 terminate(_Req, {_UserID, _Nickname, RoomNames}) when is_list(RoomNames) ->
-	io:format("Controlled handler disconnect, unsubscribing from rooms ~p ~n", [RoomNames]),
+	io:format("! Connection terminated, unsubscribing from rooms ~p~n", [RoomNames]),
 	lists:map(fun echat_room:unsubscribe/1, RoomNames),
 	ok;
-terminate(Req, User) ->
-	io:format("Uncontrolled handler terminate, Req ~p user is ~p~n", [Req, User]),
+terminate(_Req, State) ->
+	io:format("! Connection terminated. State was ~p~n", [State]),
 	ok.
 	
 % handle
@@ -63,7 +63,7 @@ handle(<<"user">>, {[
 	{<<"nickname">>, Nickname},
 	{<<"rooms">>, RoomsInfo}
 ]}, Req, _User) when is_integer(UserID), is_binary(Nickname) ->
-	io:format("rooms info ~p~n", [RoomsInfo]),
+	io:format("! Received user data (~p, ~p, ~p) for connection ~p~n", [UserID, Nickname, RoomsInfo, self()]),
 	res(
 		<<"rooms_old_messages">>, 
 		user_res(RoomsInfo), 
@@ -75,6 +75,7 @@ handle(<<"user">>, {[
 		}
 	);
 handle(<<"join">>, RoomName, Req, {UserID, Nickname, RoomNames}) when is_binary(RoomName) ->
+	io:format("! Connection ~p joins ~p~n", [self(), RoomName]),
 	echat_room:subscribe(RoomName),
 	res(
 		<<"room_old_messages">>,
@@ -83,13 +84,14 @@ handle(<<"join">>, RoomName, Req, {UserID, Nickname, RoomNames}) when is_binary(
 		{UserID, Nickname, [RoomName|RoomNames]}
 	);
 handle(<<"leave">>, RoomName, Req, User) when is_binary(RoomName) ->
+	io:format("! Connection ~p leaves ~p~n", [self(), RoomName]),
 	echat_room:unsubscribe(RoomName),
 	res(none, Req, User);
 handle(<<"message">>, {[
 	{<<"room">>, RoomName},
 	{<<"content">>, Content}
 ]}, Req, {UserID, Nickname, _RoomNames} = User) when is_binary(RoomName), is_binary(Content) ->
-	io:format("content ~p~n", [Content]),
+	io:format("! Message from ~p with content ~p, connection pid ~p~n", [Nickname, Content, self()]),
 	echat_room:save_message(RoomName, UserID, Nickname, Content),
 	res(none, Req, User);
 handle(Type, Data, Req, State) ->

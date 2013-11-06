@@ -1,3 +1,25 @@
+// tests
+
+setTimeout(testRoomProcesses, 200);
+
+function testRoomProcesses() {
+	window.chat('Luis');
+	setTimeout(function () {
+		window.chat.join('Lobby');
+		setTimeout(function () {
+			window.chat.room('Lobby').send('Hi');
+			setTimeout(function () {
+				window.chat.leave('Lobby');
+				setTimeout(function () {
+					window.chat.join('Lobby');
+				}, 200);
+			}, 200);
+		}, 200);
+	}, 200);
+}
+
+// end tests
+
 (function () {
 
 $(document).ready(start);

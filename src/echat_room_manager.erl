@@ -7,16 +7,16 @@
 % api
 
 start_link(Sup) ->
-	io:format("starting manager, sup is ~p~n", [Sup]),
+	io:format("Starting room manager under supervisor ~p~n", [Sup]),
 	{ok, Pid} = gen_server:start_link(?MODULE, [], []),
-	io:format("got manager pid ~p~n", [Pid]),
+	io:format("Room manager pid ~p~n", [Pid]),
 	gen_server:cast(Pid, {start_room_sup, Sup}),
 	register(echat_room_manager, Pid),
-	io:format("manager started~n"),
+	io:format("Room manager started.~n"),
 	{ok, Pid}.
 	
 get_pid(Name) ->
-	io:format("get pid for ~p~n", [Name]),
+	io:format("Pid for ~p requested.~n", [Name]),
 	gen_server:call(whereis(echat_room_manager), {get_room, Name}).
 
 % gen_server
@@ -59,11 +59,13 @@ get_pid(SearchedName, RoomSup) ->
 			true -> Contains
 		end
 	end, false, Rooms),
+	io:format("Room manager found room with matching name: ~p~n", [FoundPid]),
 	case FoundPid of
 		FoundPid when is_pid(FoundPid) -> % exists
 			FoundPid;
 		undefined -> % has already existed but was terminated
-			supervisor:restart_child(echat_rooms, {room, SearchedName}).
+			{ok, RestartedPid} = supervisor:restart_child(RoomSup, {room, SearchedName}),
+			RestartedPid;
 		FoundPid -> % never existed
 			io:format("no process for room ~p found in sup children ~p (just found ~p)~n", [SearchedName, Rooms, FoundPid]),
 			{ok, CreatedPid} = supervisor:start_child(RoomSup, {
