@@ -1,17 +1,16 @@
 // tests
 
-setTimeout(testRoomProcesses, 200);
-
-function testRoomProcesses() {
-	window.chat('Luis');
+function testRooms(id) {
+	sendRegister('Luis' + id);
 	setTimeout(function () {
-		window.chat.join('Lobby');
+		var r = 'Lobby #';
+		sendJoin(r);
 		setTimeout(function () {
-			window.chat.room('Lobby').send('Hi');
+			sendMessage(r, 'Hi');
 			setTimeout(function () {
-				window.chat.leave('Lobby');
+				sendLeave(r);
 				setTimeout(function () {
-					window.chat.join('Lobby');
+					sendJoin(r);
 				}, 200);
 			}, 200);
 		}, 200);
@@ -20,7 +19,7 @@ function testRoomProcesses() {
 
 // end tests
 
-(function () {
+
 
 $(document).ready(start);
 
@@ -58,6 +57,10 @@ function send(type, data) {
 	window.bullet.send(json);
 }
 
+function sendRegister(username) {
+	send('register', username);
+}
+
 function sendJoin(room) {
 	send('join', room);
 }
@@ -73,11 +76,11 @@ function sendMessage(room, content) {
 	});
 }
 
-function sendUser(id, nickname, rooms) {
-	send('user', {
-		id: id,
-		nickname: nickname,
-		rooms: rooms
+function sendLoad(room, timestamp, limit) {
+	send('load_messages', {
+		room: room,
+		timestamp: timestamp,
+		limit: limit
 	});
 }
 
@@ -119,16 +122,19 @@ function User(nickname) {
 	this.rooms = {};
 	
 	this.join = function (roomName) {
+		roomName = roomName.toLowerCase();
 		sendJoin(roomName);
 		this.rooms[roomName] = new Room(roomName);
 	}
 	
 	this.leave = function (roomName) {
+		roomName = roomName.toLowerCase();
 		sendLeave(roomName);
 		this.rooms[roomName] = null;
 	}
 	
 	this.room = function (roomName) {
+		roomName = roomName.toLowerCase();
 		return this.rooms[roomName];
 	}
 	
@@ -171,5 +177,3 @@ function Room(name) {
 	}
 	
 }
-
-})();

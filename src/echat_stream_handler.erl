@@ -3,16 +3,21 @@
 -export([new_message/3]).
 -export([init/4, stream/3, info/3, terminate/2]).
 
+-record(user, {
+	username,
+	rooms=[]
+}).
+
 % api
 
 new_message(ConnectionPid, RoomName, Message) ->
-	ConnectionPid ! {new_message, RoomName, Message}.
+	ConnectionPid ! {message, RoomName, Message}.
 
 % receive
 
 init(_Transport, Req, _Opts, _Active) ->
 	io:format("! New connection ~p~n", [self()]),
-	{ok, Req, undefined}. % State: {UserID, Nickname, Rooms}
+	{ok, Req, unregistered}. % State: {UserID, Nickname, Rooms}
 
 stream(EncodedData, Req, User) ->
 	try jiffy:decode(EncodedData) of
@@ -30,25 +35,33 @@ stream(EncodedData, Req, User) ->
 			res(none, Req, User)
 	end.
 
-info({new_message, RoomName, {UserID, Nickname, Timestamp, Content}}, Req, User) -> % from room
-	res(<<"new_message">>, {[
-		{<<"room">>, RoomName},
-		{<<"message">>,
-			{[
-				{<<"timestamp">>, Timestamp},
-				{<<"content">>, Content},
-				{<<"userID">>, UserID},
-				{<<"nickname">>, Nickname}
-			]}
-		}
-	]}, Req, User);
+info({message, Room, {Username, Content, Timestamp}}, Req, User) -> % from room
+	res(
+		<<"message">>, 
+		{[
+			{<<"room">>, Room},
+			{<<"message">>,
+				{[
+					{<<"username">>, Username},
+					{<<"content">>, Content},
+					{<<"timestamp">>, Timestamp}
+				]}
+			}
+		]},
+		Req,
+		User
+	);
+
 info(Msg, Req, State) ->
 	io:format("Unexpected info: ~p~n", [Msg]),
 	{ok, Req, State}.
 
-terminate(_Req, {_UserID, _Nickname, RoomNames}) when is_list(RoomNames) ->
-	io:format("! Connection terminated, unsubscribing from rooms ~p~n", [RoomNames]),
-	lists:map(fun echat_room:unsubscribe/1, RoomNames),
+terminate(_Req, #user{username=Username,rooms=Rooms}) ->
+	io:format("! Connection to ~p terminated, unsubscribing from rooms ~p~n", [Username, Rooms]),
+	lists:map(fun (Room) ->
+		echat_room:unsubscribe(Room, Username)
+	end, Rooms),
+	un_register(Username),
 	ok;
 terminate(_Req, State) ->
 	io:format("! Connection terminated. State was ~p~n", [State]),
@@ -58,44 +71,80 @@ terminate(_Req, State) ->
 
 % todo: user record instead of tuple
 
-handle(<<"user">>, {[
-	{<<"id">>, UserID},
-	{<<"nickname">>, Nickname},
-	{<<"rooms">>, RoomsInfo}
-]}, Req, _User) when is_integer(UserID), is_binary(Nickname) ->
-	io:format("! Received user data (~p, ~p, ~p) for connection ~p~n", [UserID, Nickname, RoomsInfo, self()]),
+handle(<<"register">>, Username, Req, unregistered) ->
+	io:format("! Received username req for \"~p\" in connection ~p~n", [Username, self()]),
+	{Available, NewState} = register(Username),
 	res(
-		<<"rooms_old_messages">>, 
-		user_res(RoomsInfo), 
+		<<"register_res">>,
+		{[
+			{<<"username">>, Username},
+			{<<"available">>, Available}
+		]},
 		Req,
-		{
-			UserID,
-			Nickname,
-			extract_room_names(RoomsInfo)
+		NewState
+	);
+			
+handle(<<"join">>, RoomMixedCase, Req, User = #user{username=Username,rooms=Rooms}) when is_binary(RoomMixedCase) ->
+	Room = lowercase(RoomMixedCase),
+	io:format("! Connection ~p joins ~p~n", [self(), Room]),
+	echat_room:join(Room, Username),
+	res(
+		none,
+		Req,
+		User#user{
+			rooms=lists:merge(Rooms, [Room])
 		}
 	);
-handle(<<"join">>, RoomName, Req, {UserID, Nickname, RoomNames}) when is_binary(RoomName) ->
-	io:format("! Connection ~p joins ~p~n", [self(), RoomName]),
-	echat_room:subscribe(RoomName),
+	
+handle(<<"leave">>, RoomMixedCase, Req, User = #user{username=Username,rooms=Rooms}) when is_binary(RoomMixedCase) ->
+	Room = lowercase(RoomMixedCase),
+	io:format("! Connection ~p leaves ~p~n", [self(), Room]),
+	echat_room:leave(Room, Username),
 	res(
-		<<"room_old_messages">>,
-		join_res(RoomName),
+		none,
 		Req,
-		{UserID, Nickname, [RoomName|RoomNames]}
+		User#user{
+			rooms=lists:delete(Room, Rooms)
+		}
 	);
-handle(<<"leave">>, RoomName, Req, User) when is_binary(RoomName) ->
-	io:format("! Connection ~p leaves ~p~n", [self(), RoomName]),
-	echat_room:unsubscribe(RoomName),
-	res(none, Req, User);
+	
+handle(<<"load_messages">>, {[
+	{<<"room">>, RoomMixedCase},
+	{<<"timestamp">>, Timestamp}, % load everything before this timestamp
+	{<<"limit">>, Limit}
+]}, Req, User) ->
+	Room = lowercase(RoomMixedCase),
+	io:format("! Connection ~p requests ~p messages before ~p in room ~p~n", [self(), Limit, Timestamp, Room]),
+	Messages = echat_room:load_messages_before(Room, Timestamp, Limit),
+	MessagesEjson = message_tuples_to_ejson(Messages),
+	res(
+		<<"messages">>,
+		{[
+			{<<"room">>, Room},
+			{<<"messages">>, MessagesEjson}
+		]},
+		Req,
+		User
+	);
+	
 handle(<<"message">>, {[
-	{<<"room">>, RoomName},
+	{<<"room">>, RoomMixedCase},
 	{<<"content">>, Content}
-]}, Req, {UserID, Nickname, _RoomNames} = User) when is_binary(RoomName), is_binary(Content) ->
-	io:format("! Message from ~p with content ~p, connection pid ~p~n", [Nickname, Content, self()]),
-	echat_room:save_message(RoomName, UserID, Nickname, Content),
-	res(none, Req, User);
+]}, Req, User = #user{
+	username=Username
+}) when is_binary(Content) ->
+	Room = lowercase(RoomMixedCase),
+	io:format("! Message from ~p with content ~p, connection pid ~p~n", [Username, Content, self()]),
+	% check if Rooms contain Room?
+	echat_room:save_message(Room, Username, Content),
+	res(
+		none,
+		Req,
+		User
+	);
+	
 handle(Type, Data, Req, State) ->
-	io:format("Unexpected event ~p with data ~p~n", [Type, Data]),
+	io:format("Unexpected event ~p with data ~p, State is ~p~n", [Type, Data, State]),
 	res(none, Req, State).
 	
 % response
@@ -108,48 +157,39 @@ res(Type, Data, Req, State) when is_binary(Type) ->
 		{<<"data">>, Data}
 	]}),
 	{reply, Res, Req, State}.
-	
+
 % private
 
-user_res(RoomsInfo) ->
-	lists:map(fun (
-		{[
-			{<<"name">>, RoomName},
-			{<<"latest">>, Timestamp}
-		]}
-	) when is_binary(RoomName), is_integer(Timestamp) ->
-		echat_room:subscribe(RoomName),
-		{[
-			{<<"room">>, RoomName},
-			{<<"messages">>, messages_since_ejson(RoomName, Timestamp)}
-		]}
-	end, RoomsInfo).
-	
-join_res(RoomName) when is_binary(RoomName) ->
-	{[
-		{<<"room">>, RoomName},
-		{<<"messages">>, messages_since_ejson(RoomName, -1)}
-	]}.
+lowercase(Binary) ->
+	list_to_binary(string:to_lower(binary_to_list(Binary))).
 
-extract_room_names(RoomsInfo) ->
-	ExtractRoomName = fun (
+message_tuples_to_ejson(Messages) ->
+	[
 		{[
-			{<<"name">>, RoomName},
-			{<<"latest">>, _Timestamp}
-		]}
-	) when is_binary(RoomName) ->
-		RoomName
-	end,
-	lists:map(ExtractRoomName, RoomsInfo).
-
-messages_since_ejson(RoomName, Timestamp) ->
-	MessagesDiff = lists:reverse(echat_room:messages_since(RoomName, Timestamp)),
-	TranformToEjson = fun ({UserID, Nickname, Timestamp, Content}) when is_integer(UserID), is_binary(Nickname), is_integer(Timestamp), is_binary(Content) ->
-		{[
-			{<<"timestamp">>, Timestamp},
+			{<<"username">>, Username},
 			{<<"content">>, Content},
-			{<<"userID">>, UserID},
-			{<<"nickname">>, Nickname}
+			{<<"timestamp">>, Timestamp}
 		]}
-	end,
-	lists:map(TranformToEjson, MessagesDiff).
+		|| {Username, Content, Timestamp}
+		<- Messages
+	].
+	
+register(Username) ->
+	case ets:lookup(usernames, Username) of
+		[] ->
+			ets:insert(usernames, {Username}),
+			{
+				true,
+				#user{
+					username=Username
+				}
+			};
+		[{Username}] ->
+			{
+				false,
+				unregistered
+			}
+	end.
+	
+un_register(Username) ->
+	ets:delete(usernames, Username).
