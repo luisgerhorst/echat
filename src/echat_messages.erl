@@ -1,0 +1,95 @@
+-module(echat_messages).
+
+%-export([install/0, new/3, convert_to_relative_tuple/1, save/1, read/3]).
+
+-compile([export_all]).
+
+-include_lib("stdlib/include/ms_transform.hrl").
+
+-record(messages, {
+	room,
+	username,
+	timestamp,
+	content
+}).
+
+-define(NODES, [node()]).
+
+% start
+
+start() ->
+	try create()
+	catch _Exception:_Reason -> load()
+	end.
+
+create() ->
+	ok = mnesia:create_schema(?NODES),
+	application:start(mnesia),
+	mnesia:create_table(
+		messages,
+		[
+			{attributes, record_info(fields, messages)},
+			{disc_copies, ?NODES},
+			{type, bag}
+		]
+	),
+	mnesia:wait_for_tables([messages], 5000),
+	ok.
+
+load() ->
+	application:start(mnesia),
+	mnesia:wait_for_tables([messages], 5000),
+	ok.
+	
+% data
+	
+new(Room, Username, Content) ->
+	{Room, Username, Content, timestamp_ms()}. % don't use this
+	
+timestamp_ms() ->
+	{Mega, Sec, Micro} = now(),
+	(Mega*1000000 + Sec)*1000 + round(Micro/1000). % thats ms, the internet is wrong!
+
+convert_to_relative_tuple({_Room, Username, Content, Timestamp}) ->
+	{Username, Content, Timestamp}. % you can use this
+	
+% read/write
+
+save({Room, Username, Content, Timestamp}) ->
+	Fun = fun () ->
+		mnesia:write(
+			#messages{
+				room=Room,
+				username=Username,
+				content=Content,
+				timestamp=Timestamp
+			}
+		)
+	end,
+	mnesia:activity(transaction, Fun).
+	
+read(SearchedRoom, BeforeTimestamp, Limit) -> % faster?
+	Fun = fun () ->
+		Match = ets:fun2ms(fun
+				(Message = #messages{
+					room=Room,
+					username=Username,
+					content=Content,
+					timestamp=Timestamp
+				}) when Timestamp < BeforeTimestamp, Room =:= SearchedRoom ->
+					{Username, Content, Timestamp}
+		end),
+		mnesia:select(messages, Match)
+	end,
+	MessagesBefore = lists:reverse(mnesia:activity(transaction, Fun)), % before timestamp, newest first
+	MessagesLimited = case Limit > length(MessagesBefore) of
+		true ->
+			MessagesBefore;
+		false ->
+			{Cut, _} = lists:split(Limit, MessagesBefore),
+			Cut
+	end,
+	Messages = lists:reverse(MessagesLimited), % limited before timestamp, oldest first
+	% io:format("Messages for request for before ~p, limit ~p in room ~p found: ~p~n", [BeforeTimestamp, Limit, SearchedRoom, Messages]),
+	Messages.
+

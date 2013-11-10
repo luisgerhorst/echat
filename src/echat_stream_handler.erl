@@ -39,6 +39,7 @@ stream(EncodedData, Req, User) ->
 	end.
 
 info({message, Room, {Username, Content, Timestamp}}, Req, User) -> % from room
+	io:format("Connection ~p received message.", [self()]),
 	res(
 		<<"message">>, 
 		{[

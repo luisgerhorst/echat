@@ -39,6 +39,7 @@ start(_StartType, _StartArgs) ->
     ]),
     {ok, _} = cowboy:start_http(http, 100, [{port, ?PORT}], [{env, [{dispatch, Dispatch}]}]),
     ets:new(usernames, [set, public, named_table]),
+    echat_messages:start(),
     echat_sup:start_link(). % start manager, do stuff above in manager and send manager's pid to each handler's init
 
 stop(_State) ->

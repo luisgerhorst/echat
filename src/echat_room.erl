@@ -6,15 +6,8 @@
 
 -define(USER_RECONNECT_TIMEOUT, 10000). % not sure if good, but 1000 was not enough. ask someone or look at bullet.js
 
--record(message, {
-	username,
-	timestamp=timestamp(),
-	content
-}).
-
 -record(room, {
 	name,
-	subscribers=[],
 	members=[]
 }).
 
@@ -54,14 +47,15 @@ init([Room]) ->
 
 handle_call({
 	messages_before,
-	_Timestamp,
-	_Limit
-}, _From, Room) ->
-	% get messages before Timestamp with Limit
+	Timestamp,
+	Limit
+}, _From, State = #room{
+	name=Room
+}) ->
 	{
 		reply,
-		[], % list of message tuples
-		Room
+		echat_messages:read(Room, Timestamp, Limit),
+		State
 	};
 
 handle_call(Msg, _From, State) -> io:format("Unexpected call to echat_room ~p~n", [Msg]), {noreply, State}.
@@ -70,15 +64,16 @@ handle_cast({
 	message,
 	Username,
 	Content
-}, Room = #room{
-	name=Name,
-	subscribers=Subscribers
+}, State = #room{
+	name=Room,
+	members=Members
 }) ->
-	NewMessage = #message{username=Username,content=Content},
-	send_message_to_subscribers(NewMessage, Subscribers, Name),
+	NewMessage = echat_messages:new(Room, Username, Content),
+	send_message_to_subscribers(NewMessage, Members, Room),
+	echat_messages:save(NewMessage),
 	{
 		noreply,
-		Room
+		State
 	};
 
 handle_cast({
@@ -101,8 +96,8 @@ handle_cast({
 					members=Reactivated
 				}
 			};
-		undefined -> 
-			io:format("New User.~n"),
+		undefined ->
+			io:format("New User ~p ~p.~n", [Username, Pid]),
 			MemberAdded = [{Username, Pid}|Members],
 			send_users_to_subscribers(MemberAdded, Room),
 			{
@@ -191,9 +186,10 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 % private
 
 send_message_to_subscribers(Message, Members, Room) ->
-	MessageTuple = message_record_to_tuple(Message),
+	io:format("sending new messages to members ~p~n", [Members]),
+	RelativeMessage = echat_messages:convert_to_relative_tuple(Message),
 	each_member_pid(fun (Pid) ->
-		echat_stream_handler:new_message(Pid, Room, MessageTuple)
+		echat_stream_handler:new_message(Pid, Room, RelativeMessage)
 	end, Members).
 	
 send_users_to_subscribers(Members, Room) ->
@@ -211,13 +207,3 @@ each_member_pid(Fun, Members) ->
 				{ok, Fun(Pid)}
 		end
 	end, Members).
-
-message_record_to_tuple(#message{
-	username=Username,
-	timestamp=Timestamp,
-	content=Content
-}) -> {Username, Content, Timestamp}.
-
-timestamp() ->
-	{Mega, Sec, Micro} = now(),
-	Mega * 1000000 * 1000000 + Sec * 1000000 + Micro.
