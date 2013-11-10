@@ -1,6 +1,6 @@
 -module(echat_stream_handler).
 
--export([new_message/3]).
+-export([new_message/3, members_change/3]).
 -export([init/4, stream/3, info/3, terminate/2]).
 
 -record(user, {
@@ -12,6 +12,9 @@
 
 new_message(ConnectionPid, RoomName, Message) ->
 	ConnectionPid ! {message, RoomName, Message}.
+	
+members_change(ConnectionPid, RoomName, Usernames) ->
+	ConnectionPid ! {members, RoomName, Usernames}.
 
 % receive
 
@@ -47,6 +50,17 @@ info({message, Room, {Username, Content, Timestamp}}, Req, User) -> % from room
 					{<<"timestamp">>, Timestamp}
 				]}
 			}
+		]},
+		Req,
+		User
+	);
+	
+info({members, Room, Usernames}, Req, User) -> % from room
+	res(
+		<<"users">>,
+		{[
+			{<<"room">>, Room},
+			{<<"users">>, lists:reverse(Usernames)}
 		]},
 		Req,
 		User

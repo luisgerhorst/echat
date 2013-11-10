@@ -1,6 +1,7 @@
 // tests
 
 function testRooms(id) {
+	id = (id === undefined) ? '' : ' ' + id;
 	sendRegister('Luis' + id);
 	setTimeout(function () {
 		var r = 'Lobby #';
@@ -17,6 +18,12 @@ function testRooms(id) {
 	}, 200);
 }
 
+function testFastReconnect() {
+	console.log('register & join');
+	sendRegister('Luis');
+	sendJoin('lobby');
+}
+
 // end tests
 
 
@@ -30,8 +37,9 @@ function start() {
 	// reactions
 	
 	window.bullet.onopen = function () {
-		console.log('bullet: opened');
+		console.log('bullet: opened, you should reconnect now');
 		if (window.chat.reconnect) window.chat.reconnect();
+		testFastReconnect();
 	};
 	
 	window.bullet.onmessage = function (event) {

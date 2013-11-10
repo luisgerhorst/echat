@@ -1,10 +1,10 @@
 -module(echat_room).
 -behaviour(gen_server).
 
--export([start_link/1, save_message/3, load_messages_before/3, join/2, leave/2, unsubscribe/2, member_remover/2]).
+-export([start_link/1, save_message/3, load_messages_before/3, join/2, leave/2, unsubscribe/2, member_delete_timeout/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--define(USER_RECONNECT_TIMEOUT, 10000).
+-define(USER_RECONNECT_TIMEOUT, 10000). % not sure if good, but 1000 was not enough. ask someone or look at bullet.js
 
 -record(message, {
 	username,
@@ -36,12 +36,12 @@ leave(Room, Username) ->
 	gen_server:cast(echat_room_manager:get_pid(Room), {leave, Username}).
 	
 unsubscribe(Room, Username) ->
-	gen_server:cast(echat_room_manager:get_pid(Room), {unsubscribe, Username}).
+	gen_server:cast(echat_room_manager:get_pid(Room), {disconnected, Username}).
 	
-member_remover(RoomPid, Username) ->
+member_delete_timeout(RoomPid, Username) ->
 	io:format("Remover for ~p started~n", [Username]),
 	timer:sleep(?USER_RECONNECT_TIMEOUT),
-	gen_server:cast(RoomPid, {remover_fired, Username}).
+	gen_server:cast(RoomPid, {member_delete_timeout, Username}).
 	
 % gen_server
 
@@ -86,11 +86,12 @@ handle_cast({
 	Username,
 	Pid
 }, State = #room{
-	members=Members
+	members=Members,
+	name=Room
 }) ->
 	io:format("User ~p joins room ...~n", [Username]),
 	case proplists:get_value(Username, Members) of
-		unsubscribed ->
+		disconnected ->
 			io:format("User was marked, I'll fix that.~n"),
 			DeletedMarked = proplists:delete(Username, Members),
 			Reactivated = [{Username, Pid}|DeletedMarked],
@@ -100,12 +101,14 @@ handle_cast({
 					members=Reactivated
 				}
 			};
-		undefined ->
+		undefined -> 
 			io:format("New User.~n"),
+			MemberAdded = [{Username, Pid}|Members],
+			send_users_to_subscribers(MemberAdded, Room),
 			{
 				noreply,
 				State#room{
-					members=[{Username, Pid}|Members]
+					members=MemberAdded
 				}
 			}
 	end;
@@ -114,26 +117,29 @@ handle_cast({
 	leave,
 	Username
 }, State = #room{
-	members=Members
+	members=Members,
+	name=Room
 }) ->
 	io:format("User ~p left room. Removing user.~n", [Username]),
+	MemberDeleted = proplists:delete(Username, Members),
+	send_users_to_subscribers(MemberDeleted, Room),
 	{
 		noreply,
 		State#room{
-			members=proplists:delete(Username, Members) % remove
+			members=MemberDeleted
 		}
 	};
 	
 handle_cast({
-	unsubscribe,
+	disconnected,
 	Username
 }, State = #room{
 	members=Members
 }) ->
 	io:format("Unsubscribe ~p (connection terminated) marking user and starting remover~n", [Username]),
 	Deleted = proplists:delete(Username, Members),
-	Marked = [{Username, unsubscribed}|Deleted], % mark user as disconnected
-	spawn(echat_room, member_remover, [self(), Username]), % start remover for disconnected user
+	Marked = [{Username, disconnected}|Deleted], % mark user as disconnected
+	spawn(echat_room, member_delete_timeout, [self(), Username]), % start delete timeout for disconnected user
 	{
 		noreply,
 		State#room{
@@ -142,22 +148,25 @@ handle_cast({
 	};
 	
 handle_cast({
-	remover_fired,
+	member_delete_timeout,
 	Username
 }, State = #room{
-	members=Members
+	members=Members,
+	name=Room
 }) ->
 	io:format("Reconnect Timeout for user ~p~n", [Username]),
 	case proplists:get_value(Username, Members) of
-		unsubscribed -> % hasn't reconnected
+		disconnected -> % hasn't reconnected
 			io:format("-> NOT reconnected, remove~n"),
+			MemberDeleted = proplists:delete(Username, Members),
+			send_users_to_subscribers(MemberDeleted, Room),
 			{
 				noreply,
 				State#room{
-					members=proplists:delete(Username, Members) % remove
+					members= MemberDeleted % remove
 				}
 			};
-		Pid when is_pid(Pid) -> % connected again
+		_Pid -> % reconnected
 			io:format("-> has been reconnected~n"),
 			{
 				noreply,
@@ -181,8 +190,27 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 	
 % private
 
-send_message_to_subscribers(Message, Subscribers, Room) ->
-	[echat_stream_handler:new_message(Member, Room, message_record_to_tuple(Message)) || Member <- Subscribers].
+send_message_to_subscribers(Message, Members, Room) ->
+	MessageTuple = message_record_to_tuple(Message),
+	each_member_pid(fun (Pid) ->
+		echat_stream_handler:new_message(Pid, Room, MessageTuple)
+	end, Members).
+	
+send_users_to_subscribers(Members, Room) ->
+	Usernames = [ Username || {Username, _State} <- Members ],
+	each_member_pid(fun (Pid) ->
+		echat_stream_handler:members_change(Pid, Room, Usernames)
+	end, Members).
+	
+each_member_pid(Fun, Members) ->
+	lists:map(fun ({_Username, Connection}) ->
+		case Connection of
+			disconnected ->
+				{error, disconnected};
+			Pid ->
+				{ok, Fun(Pid)}
+		end
+	end, Members).
 
 message_record_to_tuple(#message{
 	username=Username,
