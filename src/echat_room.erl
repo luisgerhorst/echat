@@ -1,7 +1,12 @@
 -module(echat_room).
 -behaviour(gen_server).
 
--export([start_link/1, save_message/3, load_messages_before/3, join/2, leave/2, unsubscribe/2, member_delete_timeout/2]).
+-export([
+	start_link/1,
+	join/2, leave/2, unsubscribe/2, member_reconnect_timeout/2,
+	message/3, messages_before/3, messages_between/3
+]).
+
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -define(USER_RECONNECT_TIMEOUT, 10000). % not sure if good, but 1000 was not enough. ask someone or look at bullet.js
@@ -15,12 +20,6 @@
 
 start_link(Room) ->
 	gen_server:start_link(?MODULE, [Room], [{debug, [log]}]).
-
-save_message(Room, Username, Content) ->
-	gen_server:cast(echat_room_manager:get_pid(Room), {message, Username, Content}).
-	
-load_messages_before(Room, Timestamp, Limit) ->
-	gen_server:call(echat_room_manager:get_pid(Room), {messages_before, Timestamp, Limit}).
 	
 join(Room, Username) ->
 	gen_server:cast(echat_room_manager:get_pid(Room), {join, Username, self()}).
@@ -31,10 +30,19 @@ leave(Room, Username) ->
 unsubscribe(Room, Username) ->
 	gen_server:cast(echat_room_manager:get_pid(Room), {disconnected, Username}).
 	
-member_delete_timeout(RoomPid, Username) ->
+member_reconnect_timeout(RoomPid, Username) ->
 	io:format("Remover for ~p started~n", [Username]),
 	timer:sleep(?USER_RECONNECT_TIMEOUT),
-	gen_server:cast(RoomPid, {member_delete_timeout, Username}).
+	gen_server:cast(RoomPid, {member_reconnect_timeout, Username}).
+
+message(Room, Username, Content) ->
+	gen_server:cast(echat_room_manager:get_pid(Room), {message, Username, Content}).
+
+messages_before(Room, Timestamp, Limit) ->
+	gen_server:call(echat_room_manager:get_pid(Room), {messages_before, Timestamp, Limit}).
+
+messages_between(Room, StartTimestamp, EndTimestamp) ->
+	gen_server:call(echat_room_manager:get_pid(Room), {messages_between, StartTimestamp, EndTimestamp}).
 	
 % gen_server
 
@@ -44,38 +52,7 @@ init([Room]) ->
 	{ok, #room{
 		name=Room
 	}}.
-
-handle_call({
-	messages_before,
-	Timestamp,
-	Limit
-}, _From, State = #room{
-	name=Room
-}) ->
-	{
-		reply,
-		echat_messages:read(Room, Timestamp, Limit),
-		State
-	};
-
-handle_call(Msg, _From, State) -> io:format("Unexpected call to echat_room ~p~n", [Msg]), {noreply, State}.
 	
-handle_cast({
-	message,
-	Username,
-	Content
-}, State = #room{
-	name=Room,
-	members=Members
-}) ->
-	NewMessage = echat_messages:new(Room, Username, Content),
-	send_message_to_subscribers(NewMessage, Members, Room),
-	echat_messages:save(NewMessage),
-	{
-		noreply,
-		State
-	};
-
 handle_cast({
 	join,
 	Username,
@@ -99,7 +76,7 @@ handle_cast({
 		undefined ->
 			io:format("New User ~p ~p.~n", [Username, Pid]),
 			MemberAdded = [{Username, Pid}|Members],
-			send_users_to_subscribers(MemberAdded, Room),
+			send_users_to_subscribers(MemberAdded, Room, {join, Username}),
 			{
 				noreply,
 				State#room{
@@ -117,14 +94,14 @@ handle_cast({
 }) ->
 	io:format("User ~p left room. Removing user.~n", [Username]),
 	MemberDeleted = proplists:delete(Username, Members),
-	send_users_to_subscribers(MemberDeleted, Room),
+	send_users_to_subscribers(MemberDeleted, Room, {leave, Username}),
 	{
 		noreply,
 		State#room{
 			members=MemberDeleted
 		}
 	};
-	
+
 handle_cast({
 	disconnected,
 	Username
@@ -134,16 +111,16 @@ handle_cast({
 	io:format("Unsubscribe ~p (connection terminated) marking user and starting remover~n", [Username]),
 	Deleted = proplists:delete(Username, Members),
 	Marked = [{Username, disconnected}|Deleted], % mark user as disconnected
-	spawn(echat_room, member_delete_timeout, [self(), Username]), % start delete timeout for disconnected user
+	spawn(echat_room, member_reconnect_timeout, [self(), Username]), % start delete timeout for disconnected user
 	{
 		noreply,
 		State#room{
 			members=Marked
 		}
 	};
-	
+
 handle_cast({
-	member_delete_timeout,
+	member_reconnect_timeout,
 	Username
 }, State = #room{
 	members=Members,
@@ -154,7 +131,7 @@ handle_cast({
 		disconnected -> % hasn't reconnected
 			io:format("-> NOT reconnected, remove~n"),
 			MemberDeleted = proplists:delete(Username, Members),
-			send_users_to_subscribers(MemberDeleted, Room),
+			send_users_to_subscribers(MemberDeleted, Room, {leave, Username}),
 			{
 				noreply,
 				State#room{
@@ -169,7 +146,51 @@ handle_cast({
 			}
 	end;
 	
+handle_cast({
+	message,
+	Username,
+	Content
+}, State = #room{
+	name=Room,
+	members=Members
+}) ->
+	NewMessage = echat_messages:new(Room, Username, Content),
+	send_message_to_subscribers(NewMessage, Members, Room),
+	echat_messages:save(NewMessage),
+	{
+		noreply,
+		State
+	};
+	
 handle_cast(Msg, State) -> io:format("Unexpected cast to echat_room ~p~n", [Msg]), {noreply, State}.
+
+handle_call({
+	messages_before,
+	Timestamp,
+	Limit
+}, _From, State = #room{
+	name=Room
+}) ->
+	{
+		reply,
+		echat_messages:before(Room, Timestamp, Limit),
+		State
+	};
+	
+handle_call({
+	messages_between,
+	StartTimestamp,
+	EndTimestamp
+}, _From, State = #room{
+	name=Room
+}) ->
+	{
+		reply,
+		echat_messages:between(Room, StartTimestamp, EndTimestamp),
+		State
+	};
+
+handle_call(Msg, _From, State) -> io:format("Unexpected call to echat_room ~p~n", [Msg]), {noreply, State}.
 	
 handle_info(Msg, State) -> io:format("Unexpected message to echat_room ~p~n", [Msg]), {noreply, State}.
 
@@ -192,18 +213,16 @@ send_message_to_subscribers(Message, Members, Room) ->
 		echat_stream_handler:new_message(Pid, Room, RelativeMessage)
 	end, Members).
 	
-send_users_to_subscribers(Members, Room) ->
+send_users_to_subscribers(Members, Room, Action) ->
 	Usernames = [ Username || {Username, _State} <- Members ],
 	each_member_pid(fun (Pid) ->
-		echat_stream_handler:members_change(Pid, Room, Usernames)
+		echat_stream_handler:members_change(Pid, Room, Usernames, Action)
 	end, Members).
 	
 each_member_pid(Fun, Members) ->
-	lists:map(fun ({_Username, Connection}) ->
+	lists:foreach(fun ({_Username, Connection}) ->
 		case Connection of
-			disconnected ->
-				{error, disconnected};
-			Pid ->
-				{ok, Fun(Pid)}
+			disconnected -> ok;
+			Pid -> Fun(Pid)
 		end
 	end, Members).

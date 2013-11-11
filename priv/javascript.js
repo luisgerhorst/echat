@@ -37,14 +37,14 @@ function start() {
 	// reactions
 	
 	window.bullet.onopen = function () {
-		console.log('bullet: opened, you should reconnect now');
+		console.log('bullet opened');
 		if (window.chat.reconnect) window.chat.reconnect();
 		testFastReconnect();
 	};
 	
 	window.bullet.onmessage = function (event) {
 		try {
-			//console.log('received', event.data);
+			console.log('received', event.data);
 			var object = JSON.parse(event.data);
 			handle(object.type, object.data);
 		} catch (error) {
@@ -84,11 +84,19 @@ function sendMessage(room, content) {
 	});
 }
 
-function sendLoad(room, timestamp, limit) {
-	send('load_messages', {
+function sendLoadBefore(room, timestamp, limit) {
+	send('messages_before', {
 		room: room,
 		timestamp: timestamp,
 		limit: limit
+	});
+}
+
+function sendLoadBetween(room, startTimestamp, endTimestamp) {
+	send('messages_between', {
+		room: room,
+		startTimestamp: startTimestamp,
+		endTimestamp: endTimestamp
 	});
 }
 
@@ -96,20 +104,25 @@ function sendLoad(room, timestamp, limit) {
 
 function handle(type, data) {
 	switch (type) {
-		case 'rooms_old_messages':
-			for (var i = data.length; i--;) {
-				var dataElement = data[i];
-				window.chat.room(dataElement.room).append(dataElement.messages);
-			}
+		case 'register_res':
+			// { username, accepted }
+			// tell user if username accepted
+			// if accepted start chat
 			break;
-		case 'room_old_messages':
-			window.chat.room(data.room).append(data.messages);
+		case 'users':
+			// { room, users: [username], action: 'join'|'leave', username} }
+			// pass to handler for user changes
 			break;
-		case 'new_message':
-			window.chat.room(data.room).append([data.message]);
+		case 'messages':
+			// { room, messages: [{ username, content, timestamp }] }
+			// pass messages to special handler that inserts on right position
+			break;
+		case 'message':
+			// { room, message: { username, content, timestamp } }
+			// pass message to hanlder that appends (maybe also sorts)
 			break;
 		default:
-			throw 'Unexpected type';
+			throw 'unexpected type';
 	}
 }
 

@@ -1,8 +1,6 @@
 -module(echat_messages).
 
-%-export([install/0, new/3, convert_to_relative_tuple/1, save/1, read/3]).
-
--compile([export_all]).
+-export([start/0, new/3, convert_to_relative_tuple/1, save/1, before/3, between/3]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 
@@ -68,7 +66,7 @@ save({Room, Username, Content, Timestamp}) ->
 	end,
 	mnesia:activity(transaction, Fun).
 	
-read(SearchedRoom, BeforeTimestamp, Limit) -> % faster?
+before(SearchedRoom, BeforeTimestamp, Limit) -> % faster?
 	Fun = fun () ->
 		Match = ets:fun2ms(fun
 				(Message = #messages{
@@ -76,7 +74,7 @@ read(SearchedRoom, BeforeTimestamp, Limit) -> % faster?
 					username=Username,
 					content=Content,
 					timestamp=Timestamp
-				}) when Timestamp < BeforeTimestamp, Room =:= SearchedRoom ->
+				}) when Room =:= SearchedRoom, Timestamp < BeforeTimestamp ->
 					{Username, Content, Timestamp}
 		end),
 		mnesia:select(messages, Match)
@@ -92,4 +90,19 @@ read(SearchedRoom, BeforeTimestamp, Limit) -> % faster?
 	Messages = lists:reverse(MessagesLimited), % limited before timestamp, oldest first
 	% io:format("Messages for request for before ~p, limit ~p in room ~p found: ~p~n", [BeforeTimestamp, Limit, SearchedRoom, Messages]),
 	Messages.
+	
+between(SearchedRoom, StartTimestamp, EndTimestamp) ->
+	Fun = fun () ->
+		Match = ets:fun2ms(fun
+				(Message = #messages{
+					room=Room,
+					username=Username,
+					content=Content,
+					timestamp=Timestamp
+				}) when Room =:= SearchedRoom, StartTimestamp < Timestamp, Timestamp < EndTimestamp ->
+					{Username, Content, Timestamp}
+		end),
+		mnesia:select(messages, Match)
+	end,
+	mnesia:activity(transaction, Fun).
 
