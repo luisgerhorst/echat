@@ -82,6 +82,12 @@ handle_cast({
 				State#room{
 					members=MemberAdded
 				}
+			};
+		Pid ->
+			io:format("Unexpected join, username ~p already associated with pid ~p~n", [Username, Pid]),
+			{
+				noreply,
+				State
 			}
 	end;
 

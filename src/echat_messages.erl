@@ -46,7 +46,7 @@ new(Room, Username, Content) ->
 	
 timestamp_ms() ->
 	{Mega, Sec, Micro} = now(),
-	(Mega*1000000 + Sec)*1000 + round(Micro/1000). % thats ms, the internet is wrong!
+	(Mega*1000000 + Sec)*1000 + Micro/1000. % thats ms, the internet is wrong! I use a double so you can well use it as id for messages
 
 convert_to_relative_tuple({_Room, Username, Content, Timestamp}) ->
 	{Username, Content, Timestamp}. % you can use this

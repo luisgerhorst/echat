@@ -3,18 +3,13 @@
 -export([new_message/3, members_change/4]).
 -export([init/4, stream/3, info/3, terminate/2]).
 
--record(user, {
-	username,
-	rooms=[]
-}).
-
 % api
 
-new_message(ConnectionPid, RoomName, Message) ->
-	ConnectionPid ! {message, RoomName, Message}.
+new_message(Pid, Room, Message) ->
+	Pid ! {message, Room, Message}.
 	
-members_change(ConnectionPid, RoomName, Usernames, Action) ->
-	ConnectionPid ! {members, RoomName, Usernames, Action}.
+members_change(Pid, Room, Usernames, Action) ->
+	Pid ! {members, Room, Usernames, Action}.
 
 % receive
 
@@ -22,23 +17,23 @@ init(_Transport, Req, _Opts, _Active) ->
 	io:format("! New connection ~p~n", [self()]),
 	{ok, Req, unregistered}. % State: {UserID, Nickname, Rooms}
 
-stream(EncodedData, Req, User) ->
+stream(EncodedData, Req, State) ->
 	try jiffy:decode(EncodedData) of
 		{[
 			{<<"type">>, Type},
 			{<<"data">>, Data}
 		]} ->
-			handle(Type, Data, Req, User);
+			handle(Type, Data, Req, State);
 		Ejson ->
 			io:format("Parsing message ~p resulted in invalid event ejson ~p~n", [EncodedData, Ejson]),
-			res(none, Req, User)
+			res(none, Req, State)
 	catch
 		Exception:Reason ->
 			io:format("Parsing message ~p cause error ~p ~p~n", [EncodedData, Exception, Reason]),
-			res(none, Req, User)
+			res(none, Req, State)
 	end.
 	
-info({members, Room, Usernames, {Action, Username}}, Req, User) -> % from room
+info({members, Room, Usernames, {Action, Username}}, Req, State = {registered, _Username, _Rooms}) ->
 	res(
 		<<"users">>,
 		{[
@@ -48,11 +43,10 @@ info({members, Room, Usernames, {Action, Username}}, Req, User) -> % from room
 			{<<"username">>, Username}
 		]},
 		Req,
-		User
+		State
 	);
 
-info({message, Room, {Username, Content, Timestamp}}, Req, User) -> % from room
-	io:format("Connection ~p received message.", [self()]),
+info({message, Room, {Username, Content, Timestamp}}, Req, State = {registered, _Username, _Rooms}) ->
 	res(
 		<<"message">>, 
 		{[
@@ -66,16 +60,16 @@ info({message, Room, {Username, Content, Timestamp}}, Req, User) -> % from room
 			}
 		]},
 		Req,
-		User
+		State
 	);
 
 info(Msg, Req, State) ->
-	io:format("Unexpected info: ~p~n", [Msg]),
+	io:format("Unexpected info ~p at state ~p~n", [Msg, State]),
 	{ok, Req, State}.
 
-terminate(_Req, #user{username=Username,rooms=Rooms}) ->
+terminate(_Req, {registered, Username, Rooms}) ->
 	io:format("! Connection to ~p terminated, unsubscribing from rooms ~p~n", [Username, Rooms]),
-	lists:map(fun (Room) ->
+	lists:foreach(fun (Room) ->
 		echat_room:unsubscribe(Room, Username)
 	end, Rooms),
 	unregister_username(Username),
@@ -86,68 +80,56 @@ terminate(_Req, State) ->
 	
 % handle
 
-% todo: user record instead of tuple
-
 handle(<<"register">>, Username, Req, unregistered) ->
 	io:format("! Received username req for ~p in connection ~p~n", [Username, self()]),
-	{Available, NewState} = register_username(Username),
+	{Accepted, NewState} = register_username(Username),
+	io:format("Accepted ~p, new state ~p~n", [Accepted, NewState]),
 	res(
 		<<"register_res">>,
 		{[
 			{<<"username">>, Username},
-			{<<"accepted">>, Available}
+			{<<"accepted">>, Accepted}
 		]},
 		Req,
 		NewState
 	);
 			
-handle(<<"join">>, RoomMixedCase, Req, User = #user{
-	username=Username,
-	rooms=Rooms
-}) when is_binary(RoomMixedCase) ->
+handle(<<"join">>, RoomMixedCase, Req, {registered, Username, Rooms}) when is_binary(RoomMixedCase) ->
 	Room = lowercase(RoomMixedCase),
 	io:format("! Connection ~p joins ~p~n", [self(), Room]),
 	echat_room:join(Room, Username),
 	res(
 		none,
 		Req,
-		User#user{
-			rooms=lists:merge(Rooms, [Room])
-		}
+		{registered, Username, lists:merge(Rooms, [Room])}
 	);
 	
-handle(<<"leave">>, RoomMixedCase, Req, User = #user{
-	username=Username,
-	rooms=Rooms
-}) when is_binary(RoomMixedCase) ->
+% don't forget to check if user is room member when handling the following requests
+	
+handle(<<"leave">>, RoomMixedCase, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase) ->
 	Room = lowercase(RoomMixedCase),
 	io:format("! Connection ~p leaves ~p~n", [self(), Room]),
-	case lists:member(Room, Rooms) of false -> res(none, Req, User); true ->
+	case lists:member(Room, Rooms) of false -> res(none, Req, State); true ->
 		echat_room:leave(Room, Username),
 		res(
 			none,
 			Req,
-			User#user{
-				rooms=lists:delete(Room, Rooms)
-			}
+			{registered, Username, lists:delete(Room, Rooms)}
 		)
 	end;
 	
 handle(<<"message">>, {[
 	{<<"room">>, RoomMixedCase},
 	{<<"content">>, Content}
-]}, Req, User = #user{
-	username=Username,
-	rooms=Rooms
-}) when is_binary(Content) ->
+]}, Req, State = {registered, Username, Rooms}) when is_binary(Content) ->
 	Room = lowercase(RoomMixedCase),
 	io:format("! Message from ~p with content ~p, connection pid ~p~n", [Username, Content, self()]),
-	case lists:member(Room, Rooms) of false -> res(none, Req, User); true ->
+	case lists:member(Room, Rooms) of false -> res(none, Req, State); true ->
 		echat_room:message(Room, Username, Content),
 		res(
 			none,
 			Req,
-			User
+			State
 		)
 	end;
 	
@@ -155,12 +137,10 @@ handle(<<"messages_before">>, {[
 	{<<"room">>, RoomMixedCase},
 	{<<"timestamp">>, Timestamp}, % load everything before this timestamp
 	{<<"limit">>, Limit}
-]}, Req, User = #user{
-	rooms=Rooms
-}) ->
+]}, Req, State = {registered, _Username, Rooms}) ->
 	Room = lowercase(RoomMixedCase),
 	io:format("! Connection ~p requests ~p messages before ~p in room ~p~n", [self(), Limit, Timestamp, Room]),
-	case lists:member(Room, Rooms) of false -> res(none, Req, User); true ->
+	case lists:member(Room, Rooms) of false -> res(none, Req, State); true ->
 		Messages = echat_room:messages_before(Room, Timestamp, Limit),
 		MessagesEjson = message_tuples_to_ejson(Messages),
 		res(
@@ -170,7 +150,7 @@ handle(<<"messages_before">>, {[
 				{<<"messages">>, MessagesEjson}
 			]},
 			Req,
-			User
+			State
 		)
 	end;
 	
@@ -178,12 +158,10 @@ handle(<<"messages_between">>, {[
 	{<<"room">>, RoomMixedCase},
 	{<<"startTimestamp">>, StartTimestamp}, % load everything before this timestamp
 	{<<"endTimestamp">>, EndTimestamp}
-]}, Req, User = #user{
-	rooms=Rooms
-}) ->
+]}, Req, State = {registered, Username, Rooms}) ->
 	Room = lowercase(RoomMixedCase),
-	io:format("! Connection to ~p requests messages between ~p and ~p in room ~p~n", [User#user.username, StartTimestamp, EndTimestamp, Room]),
-	case lists:member(Room, Rooms) of false -> res(none, Req, User); true ->
+	io:format("! Connection to ~p requests messages between ~p and ~p in room ~p~n", [Username, StartTimestamp, EndTimestamp, Room]),
+	case lists:member(Room, Rooms) of false -> res(none, Req, State); true ->
 		Messages = echat_room:messages_between(Room, StartTimestamp, EndTimestamp),
 		MessagesEjson = message_tuples_to_ejson(Messages),
 		res(
@@ -193,7 +171,7 @@ handle(<<"messages_between">>, {[
 				{<<"messages">>, MessagesEjson}
 			]},
 			Req,
-			User
+			State
 		)
 	end;
 	
@@ -227,6 +205,8 @@ message_tuples_to_ejson(Messages) ->
 		|| {Username, Content, Timestamp}
 		<- Messages
 	].
+
+% usernames
 	
 register_username(Username) ->
 	case ets:lookup(usernames, Username) of
@@ -234,9 +214,7 @@ register_username(Username) ->
 			ets:insert(usernames, {Username}),
 			{
 				true,
-				#user{
-					username=Username
-				}
+				{registered, Username, []}
 			};
 		[{Username}] ->
 			{

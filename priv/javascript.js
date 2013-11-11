@@ -22,6 +22,7 @@ function testFastReconnect() {
 	console.log('register & join');
 	sendRegister('Luis');
 	sendJoin('lobby');
+	sendMessage('lobby', 'Hi');
 }
 
 // end tests
