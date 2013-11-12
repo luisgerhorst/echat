@@ -1,15 +1,96 @@
+(function () {
+	
 $(document).ready(function () {
+	var chat = window.echat = new Chat();
 	
-	// testing
+	// test
 	
-	window.c = new Connection();
-	
-	c.onRegisterRes = function (username, accepted) {
-		var acceptedString = accepted ? 'accepted' : 'not accepted';
-		console.log('Username ' + username + ' was ' + acceptedString + '.');
-	};
+	chat.ready(function () {
+		
+		console.log('opened');
+		
+		chat.username('mark', function (accepted) {
+			console.log('callback', 'mark', accepted);
+		});
+		
+		chat.join('lobby');
+		
+	});
 	
 });
+	
+function Chat() {
+	
+	var Chat = this;
+	
+	var connection = new Connection();
+	
+	// start
+	
+	Chat.ready = function (callback) {
+		connection.ready = callback;
+	};
+	
+	// register
+	
+	var expectedRegisterRes = null;
+	
+	Chat.username = function (username, callback) {
+		if (!expectedRegisterRes) {
+			connection.register(username);
+			expectedRegisterRes = {
+				username: username,
+				callback: callback
+			};
+		}
+	};
+	
+	connection.onRegisterRes = function (username, accepted) {
+		if (expectedRegisterRes && expectedRegisterRes.username === username) {
+			expectedRegisterRes.callback(accepted);
+			expectedRegisterRes = null;
+		}
+	};
+	
+	// rooms
+	
+	var rooms = {};
+	
+	// add
+	
+	Chat.join = function (name) {
+		if (rooms[name]) throw 'already member';
+		connection.join(name);
+		rooms[room] = new Room(name);
+	};
+	
+	// get
+	
+	Chat.room = function (name) {
+		if (!rooms[name]) throw 'no member';
+		return rooms[name];
+	}
+	
+	// remove
+	
+	Chat.leave = function (name) {
+		if (!rooms[name]) throw 'no member';
+		rooms[name] = null;
+	}
+	
+	// constructor
+	
+	function Room(name) {
+	
+		var Room = this;
+	
+		Room.send = function (content, callback) {
+			connection.sendMessage(name, content);
+		}
+	
+	}
+	
+}
 
 function Connection() {
 	
@@ -17,12 +98,11 @@ function Connection() {
 	
 	// fake handlers
 	
+	Connection.ready = function () {};
+	Connection.reconnect = function () {};
 	Connection.onRegisterRes = function () {};
-	
 	Connection.onUsersChange = function () {};
-	
 	Connection.onMessages = function () {};
-	
 	Connection.onMessage = function () {};
 	
 	// handle
@@ -50,12 +130,67 @@ function Connection() {
 		}
 	}
 	
+	function installActions() {
+		
+		function send(type, data) {
+			var json = JSON.stringify({
+				type: type,
+				data: data
+			});
+			// console.log('sending', json);
+			bullet.send(json);
+		}
+		
+		Connection.register = function (username) {
+			send('register', username);
+		};
+		
+		Connection.join = function (room) {
+			send('join', room);
+		};
+		
+		Connection.leave = function (room) {
+			send('leave', room);
+		};
+		
+		Connection.sendMessage = function (room, content) {
+			send('message', {
+				room: room,
+				content: content
+			});
+		};
+		
+		Connection.loadMessagesBefore = function (room, timestamp, limit) {
+			send('messages_before', {
+				room: room,
+				timestamp: timestamp,
+				limit: limit
+			});
+		};
+		
+		Connection.loadMessagesBetween = function (room, startTimestamp, endTimestamp) {
+			send('messages_between', {
+				room: room,
+				startTimestamp: startTimestamp,
+				endTimestamp: endTimestamp
+			});
+		};
+		
+	}
+	
 	// actions
 	
-	var bullet = $.bullet('ws://localhost:8080/bullet');
+	var bullet = $.bullet('ws://' + window.document.location.host + '/bullet');
+	
+	var firstOpen = true;
 	
 	bullet.onopen = function () {
-		console.log('bullet: opened');
+		// console.log('bullet: opened');
+		if (firstOpen) {
+			firstOpen = false;
+			installActions();
+			Connection.ready();
+		} else Connection.reconnect();
 	};
 	
 	bullet.ondisconnect = function () {
@@ -68,7 +203,7 @@ function Connection() {
 	
 	bullet.onmessage = function (event) {
 		try {
-			console.log('received', event.data);
+			// console.log('received', event.data);
 			var object = JSON.parse(event.data);
 			handle(object.type, object.data);
 		} catch (error) {
@@ -76,53 +211,34 @@ function Connection() {
 		}
 	};
 	
-	function send(type, data) {
-		var json = JSON.stringify({
-			type: type,
-			data: data
-		});
-		// console.log('sending', json);
-		bullet.send(json);
-	}
-	
-	Connection.register = function (username) {
-		send('register', username);
-	};
-	
-	Connection.join = function (room) {
-		send('join', room);
-	};
-	
-	Connection.leave = function (room) {
-		send('leave', room);
-	};
-	
-	Connection.sendMessage = function (room, content) {
-		send('message', {
-			room: room,
-			content: content
-		});
-	};
-	
-	Connection.loadMessagesBefore = function (room, timestamp, limit) {
-		send('messages_before', {
-			room: room,
-			timestamp: timestamp,
-			limit: limit
-		});
-	};
-	
-	Connection.loadMessagesBetween = function (room, startTimestamp, endTimestamp) {
-		send('messages_between', {
-			room: room,
-			startTimestamp: startTimestamp,
-			endTimestamp: endTimestamp
-		});
-	};
-	
 }
 
-/*window.chat = login;
+/*
+
+window.c = new Connection();
+
+c.ready = function () {
+	c.register('Luis');
+	c.join('lobby');
+	c.sendMessage('lobby', 'Hi');
+};
+
+c.reconnect = function () {
+	c.register('Luis');
+	c.join('lobby');
+	c.sendMessage('lobby', 'I\'m back');
+};
+
+c.onRegisterRes = function (username, accepted) {
+	var acceptedString = accepted ? 'accepted' : 'not accepted';
+	console.log('Username "' + username + '" was ' + acceptedString + '.');
+};
+
+c.onMessage = function (room, username, content, timestamp) {
+	console.log('Message from "' + username + '" with content "' + content + '" in room "' + room + '" received at ' + timestamp);
+};
+
+window.chat = login;
 
 function login(nickname) {
 	window.chat = new User(nickname);
@@ -192,3 +308,5 @@ function Room(name) {
 	}
 	
 }*/
+
+})();
