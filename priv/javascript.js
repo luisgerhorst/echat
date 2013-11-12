@@ -1,135 +1,128 @@
-// tests
-
-function testRooms(id) {
-	id = (id === undefined) ? '' : ' ' + id;
-	sendRegister('Luis' + id);
-	setTimeout(function () {
-		var r = 'Lobby #';
-		sendJoin(r);
-		setTimeout(function () {
-			sendMessage(r, 'Hi');
-			setTimeout(function () {
-				sendLeave(r);
-				setTimeout(function () {
-					sendJoin(r);
-				}, 200);
-			}, 200);
-		}, 200);
-	}, 200);
-}
-
-function testFastReconnect() {
-	console.log('register & join');
-	sendRegister('Luis');
-	sendJoin('lobby');
-	sendMessage('lobby', 'Hi');
-}
-
-// end tests
-
-
-
-$(document).ready(start);
-
-function start() {
+$(document).ready(function () {
 	
-	window.bullet = $.bullet('ws://localhost:8080/bullet');
+	// testing
 	
-	// reactions
+	window.c = new Connection();
 	
-	window.bullet.onopen = function () {
-		console.log('bullet opened');
-		if (window.chat.reconnect) window.chat.reconnect();
-		testFastReconnect();
+	c.onRegisterRes = function (username, accepted) {
+		var acceptedString = accepted ? 'accepted' : 'not accepted';
+		console.log('Username ' + username + ' was ' + acceptedString + '.');
 	};
 	
-	window.bullet.onmessage = function (event) {
+});
+
+function Connection() {
+	
+	var Connection = this;
+	
+	// fake handlers
+	
+	Connection.onRegisterRes = function () {};
+	
+	Connection.onUsersChange = function () {};
+	
+	Connection.onMessages = function () {};
+	
+	Connection.onMessage = function () {};
+	
+	// handle
+	
+	function handle(type, data) {
+		switch (type) {
+			case 'register_res':
+				// data = { username, accepted }
+				Connection.onRegisterRes(data.username, data.accepted); // username, accepted
+				break;
+			case 'users':
+				// data = { room, users: [username], action: 'join'|'leave', username} }
+				Connection.onUsersChange(data.room, data.users, data.action, data.username); // room, users, action, username
+				break;
+			case 'messages':
+				// data = { room, messages: [{ username, content, timestamp }] }
+				Connection.onMessages(data.room, data.messages); // room, messages
+				break;
+			case 'message':
+				// data = { room, message: { username, content, timestamp } }
+				Connection.onMessage(data.room, data.message.username, data.message.content, data.message.timestamp); // room, username, content, timestamp
+				break;
+			default:
+				throw 'unexpected type';
+		}
+	}
+	
+	// actions
+	
+	var bullet = $.bullet('ws://localhost:8080/bullet');
+	
+	bullet.onopen = function () {
+		console.log('bullet: opened');
+	};
+	
+	bullet.ondisconnect = function () {
+		console.log('bullet: disconnected');
+	};
+	
+	bullet.onclose = function () {
+		console.log('bullet: closed');
+	};
+	
+	bullet.onmessage = function (event) {
 		try {
 			console.log('received', event.data);
 			var object = JSON.parse(event.data);
 			handle(object.type, object.data);
 		} catch (error) {
-			console.log('Unable to handle invalid message', event.data, 'error', error);
+			console.error('eChat: Unable to handle invalid message', event.data, 'because of error', error);
 		}
+	};
+	
+	function send(type, data) {
+		var json = JSON.stringify({
+			type: type,
+			data: data
+		});
+		// console.log('sending', json);
+		bullet.send(json);
+	}
+	
+	Connection.register = function (username) {
+		send('register', username);
+	};
+	
+	Connection.join = function (room) {
+		send('join', room);
+	};
+	
+	Connection.leave = function (room) {
+		send('leave', room);
+	};
+	
+	Connection.sendMessage = function (room, content) {
+		send('message', {
+			room: room,
+			content: content
+		});
+	};
+	
+	Connection.loadMessagesBefore = function (room, timestamp, limit) {
+		send('messages_before', {
+			room: room,
+			timestamp: timestamp,
+			limit: limit
+		});
+	};
+	
+	Connection.loadMessagesBetween = function (room, startTimestamp, endTimestamp) {
+		send('messages_between', {
+			room: room,
+			startTimestamp: startTimestamp,
+			endTimestamp: endTimestamp
+		});
 	};
 	
 }
 
-// actions
-
-function send(type, data) {
-	var json = JSON.stringify({
-		type: type,
-		data: data
-	});
-	//console.log('sending', json);
-	window.bullet.send(json);
-}
-
-function sendRegister(username) {
-	send('register', username);
-}
-
-function sendJoin(room) {
-	send('join', room);
-}
-
-function sendLeave(room) {
-	send('leave', room);
-}
-
-function sendMessage(room, content) {
-	send('message', {
-		room: room,
-		content: content
-	});
-}
-
-function sendLoadBefore(room, timestamp, limit) {
-	send('messages_before', {
-		room: room,
-		timestamp: timestamp,
-		limit: limit
-	});
-}
-
-function sendLoadBetween(room, startTimestamp, endTimestamp) {
-	send('messages_between', {
-		room: room,
-		startTimestamp: startTimestamp,
-		endTimestamp: endTimestamp
-	});
-}
-
-// reactions
-
-function handle(type, data) {
-	switch (type) {
-		case 'register_res':
-			// { username, accepted }
-			// tell user if username accepted
-			// if accepted start chat
-			break;
-		case 'users':
-			// { room, users: [username], action: 'join'|'leave', username} }
-			// pass to handler for user changes
-			break;
-		case 'messages':
-			// { room, messages: [{ username, content, timestamp }] }
-			// pass messages to special handler that inserts on right position
-			break;
-		case 'message':
-			// { room, message: { username, content, timestamp } }
-			// pass message to hanlder that appends (maybe also sorts)
-			break;
-		default:
-			throw 'unexpected type';
-	}
-}
-
-// data
-
-window.chat = login;
+/*window.chat = login;
 
 function login(nickname) {
 	window.chat = new User(nickname);
@@ -198,4 +191,4 @@ function Room(name) {
 		sendMessage(this.name, content);
 	}
 	
-}
+}*/

@@ -16,8 +16,12 @@
 % start
 
 start() ->
-	try create()
-	catch _Exception:_Reason -> load()
+	try
+		io:format("Trying to create a mnesia table for messages ...~n"),
+		create()
+	catch _Exception:_Reason ->
+		io:format("Error, will load existing mnesia table for messages.~n"),
+		load()
 	end.
 
 create() ->

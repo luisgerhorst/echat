@@ -80,7 +80,7 @@ terminate(_Req, State) ->
 	
 % handle
 
-handle(<<"register">>, Username, Req, unregistered) ->
+handle(<<"register">>, Username, Req, unregistered) when is_binary(Username) ->
 	io:format("! Received username req for ~p in connection ~p~n", [Username, self()]),
 	{Accepted, NewState} = register_username(Username),
 	io:format("Accepted ~p, new state ~p~n", [Accepted, NewState]),
@@ -94,22 +94,30 @@ handle(<<"register">>, Username, Req, unregistered) ->
 		NewState
 	);
 			
-handle(<<"join">>, RoomMixedCase, Req, {registered, Username, Rooms}) when is_binary(RoomMixedCase) ->
+handle(Type = <<"join">>, Data = RoomMixedCase, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase) ->
 	Room = lowercase(RoomMixedCase),
-	io:format("! Connection ~p joins ~p~n", [self(), Room]),
-	echat_room:join(Room, Username),
-	res(
-		none,
-		Req,
-		{registered, Username, lists:merge(Rooms, [Room])}
-	);
+	IsMember = lists:member(Room, Rooms),
+	if IsMember ->
+		io:format("Unexpected event ~p with data ~p, State is ~p. Already room member!~n", [Type, Data, State]),
+		res(none, Req, State);
+	not IsMember ->
+		io:format("! Connection ~p joins ~p~n", [self(), Room]),
+		echat_room:join(Room, Username),
+		res(
+			none,
+			Req,
+			{registered, Username, lists:merge(Rooms, [Room])}
+		)
+	end;
 	
-% don't forget to check if user is room member when handling the following requests
-	
-handle(<<"leave">>, RoomMixedCase, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase) ->
+handle(Type = <<"leave">>, Data = RoomMixedCase, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase) ->
 	Room = lowercase(RoomMixedCase),
-	io:format("! Connection ~p leaves ~p~n", [self(), Room]),
-	case lists:member(Room, Rooms) of false -> res(none, Req, State); true ->
+	IsMember = lists:member(Room, Rooms),
+	if not IsMember ->
+		io:format("Unexpected event ~p with data ~p, State is ~p. No room member!~n", [Type, Data, State]),
+		res(none, Req, State);
+	IsMember ->
+		io:format("! Connection ~p leaves ~p~n", [self(), Room]),
 		echat_room:leave(Room, Username),
 		res(
 			none,
@@ -118,13 +126,17 @@ handle(<<"leave">>, RoomMixedCase, Req, State = {registered, Username, Rooms}) w
 		)
 	end;
 	
-handle(<<"message">>, {[
+handle(Type = <<"message">>, Data = {[
 	{<<"room">>, RoomMixedCase},
 	{<<"content">>, Content}
-]}, Req, State = {registered, Username, Rooms}) when is_binary(Content) ->
+]}, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase), is_binary(Content) ->
 	Room = lowercase(RoomMixedCase),
-	io:format("! Message from ~p with content ~p, connection pid ~p~n", [Username, Content, self()]),
-	case lists:member(Room, Rooms) of false -> res(none, Req, State); true ->
+	IsMember = lists:member(Room, Rooms),
+	if not IsMember ->
+		io:format("Unexpected event ~p with data ~p, State is ~p. No room member!~n", [Type, Data, State]),
+		res(none, Req, State);
+	IsMember ->
+		io:format("! Message from ~p with content ~p, connection pid ~p~n", [Username, Content, self()]),
 		echat_room:message(Room, Username, Content),
 		res(
 			none,
@@ -133,14 +145,18 @@ handle(<<"message">>, {[
 		)
 	end;
 	
-handle(<<"messages_before">>, {[
+handle(Type = <<"messages_before">>, Data = {[
 	{<<"room">>, RoomMixedCase},
 	{<<"timestamp">>, Timestamp}, % load everything before this timestamp
 	{<<"limit">>, Limit}
-]}, Req, State = {registered, _Username, Rooms}) ->
+]}, Req, State = {registered, _Username, Rooms}) when is_binary(RoomMixedCase), is_number(Timestamp), is_integer(Limit) ->
 	Room = lowercase(RoomMixedCase),
-	io:format("! Connection ~p requests ~p messages before ~p in room ~p~n", [self(), Limit, Timestamp, Room]),
-	case lists:member(Room, Rooms) of false -> res(none, Req, State); true ->
+	IsMember = lists:member(Room, Rooms),
+	if not IsMember ->
+		io:format("Unexpected event ~p with data ~p, State is ~p. No room member!~n", [Type, Data, State]),
+		res(none, Req, State);
+	IsMember ->
+		io:format("! Connection ~p requests ~p messages before ~p in room ~p~n", [self(), Limit, Timestamp, Room]),
 		Messages = echat_room:messages_before(Room, Timestamp, Limit),
 		MessagesEjson = message_tuples_to_ejson(Messages),
 		res(
@@ -154,14 +170,18 @@ handle(<<"messages_before">>, {[
 		)
 	end;
 	
-handle(<<"messages_between">>, {[
+handle(Type = <<"messages_between">>, Data = {[
 	{<<"room">>, RoomMixedCase},
 	{<<"startTimestamp">>, StartTimestamp}, % load everything before this timestamp
 	{<<"endTimestamp">>, EndTimestamp}
-]}, Req, State = {registered, Username, Rooms}) ->
+]}, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase), is_number(StartTimestamp), is_number(EndTimestamp) ->
 	Room = lowercase(RoomMixedCase),
-	io:format("! Connection to ~p requests messages between ~p and ~p in room ~p~n", [Username, StartTimestamp, EndTimestamp, Room]),
-	case lists:member(Room, Rooms) of false -> res(none, Req, State); true ->
+	IsMember = lists:member(Room, Rooms),
+	if not IsMember ->
+		io:format("Unexpected event ~p with data ~p, State is ~p. No room member!~n", [Type, Data, State]),
+		res(none, Req, State);
+	IsMember ->
+		io:format("! Connection to ~p requests messages between ~p and ~p in room ~p~n", [Username, StartTimestamp, EndTimestamp, Room]),
 		Messages = echat_room:messages_between(Room, StartTimestamp, EndTimestamp),
 		MessagesEjson = message_tuples_to_ejson(Messages),
 		res(
