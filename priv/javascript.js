@@ -23,32 +23,89 @@ function Chat() {
 	
 	var Chat = this;
 	
-	var connection = new Connection();
+	var bullet = $.bullet('ws://' + window.document.location.host + '/bullet');
+	
+	var firstOpen = true;
+	
+	bullet.onopen = function () {
+		// console.log('bullet: opened');
+		if (firstOpen) {
+			firstOpen = false;
+			Chat.ready();
+		} else Chat.reconnect();
+	};
+	
+	bullet.onmessage = function (event) {
+		try {
+			// console.log('received', event.data);
+			var object = JSON.parse(event.data);
+			handle(object.type, object.data, object.ref);
+		} catch (error) {
+			console.error('eChat: Unable to handle invalid message', event.data, 'because of error', error);
+		}
+	};
+	
+	var requestHandlers = {};
+	
+	function send(type, data) {
+		
+		var ref = newRef();
+		var json = JSON.stringify({
+			type: type,
+			data: data,
+			ref: ref
+		});
+		
+		bullet.send(json);
+		return ref;
+		
+		function newRef() {
+			return Math.floor( Math.random() * Math.pow(2, 32) );
+		}
+		
+	}
+	
+	function handle(type, data, ref) {
+		switch (type) {
+			case 'register_res':
+				// data = { username, accepted }
+				requestHandlers[ref](data.accepted);
+				requestHandlers[ref] = null;
+				break;
+			case 'users':
+				// data = { room, users: [username], action: 'join'|'leave', username} }
+				if (requestHandlers[ref]) { // after join
+					requestHandlers[ref](data.users);
+					requestHandlers[ref] = null;
+				} else {
+					Chat.room(data.room).usersChange(data.action, data.username, data.users);
+				}
+				break;
+			case 'messages':
+				// data = { room, messages: [{ username, content, timestamp }] }
+				
+				break;
+			case 'message':
+				// data = { room, message: { username, content, timestamp } }
+				
+				break;
+			default:
+				throw 'unexpected type';
+		}
+	}
 	
 	// start
 	
 	Chat.ready = function (callback) {
-		connection.ready = callback;
+		Chat.ready = callback;
 	};
 	
 	// register
 	
-	var expectedRegisterRes = null;
-	
 	Chat.username = function (username, callback) {
 		if (!expectedRegisterRes) {
-			connection.register(username);
-			expectedRegisterRes = {
-				username: username,
-				callback: callback
-			};
-		}
-	};
-	
-	connection.onRegisterRes = function (username, accepted) {
-		if (expectedRegisterRes && expectedRegisterRes.username === username) {
-			expectedRegisterRes.callback(accepted);
-			expectedRegisterRes = null;
+			var ref = send('register', username);
+			onRes[ref] = callback;
 		}
 	};
 	
@@ -107,7 +164,7 @@ function Connection() {
 	
 	// handle
 	
-	function handle(type, data) {
+	function handle(type, data, ref) {
 		switch (type) {
 			case 'register_res':
 				// data = { username, accepted }
@@ -130,65 +187,74 @@ function Connection() {
 		}
 	}
 	
-	function installActions() {
+	function send(type, data) {
 		
-		function send(type, data) {
-			var json = JSON.stringify({
-				type: type,
-				data: data
-			});
-			// console.log('sending', json);
-			bullet.send(json);
+		var ref = newRef();
+		
+		var json = JSON.stringify({
+			type: type,
+			data: data,
+			ref: ref
+		});
+		
+		bullet.send(json);
+		
+		return ref;
+		
+		function newRef() {
+			return Math.floor( Math.random() * Math.pow(2, 32) );
 		}
 		
-		Connection.register = function (username) {
-			send('register', username);
-		};
-		
-		Connection.join = function (room) {
-			send('join', room);
-		};
-		
-		Connection.leave = function (room) {
-			send('leave', room);
-		};
-		
-		Connection.sendMessage = function (room, content) {
-			send('message', {
-				room: room,
-				content: content
-			});
-		};
-		
-		Connection.loadMessagesBefore = function (room, timestamp, limit) {
-			send('messages_before', {
-				room: room,
-				timestamp: timestamp,
-				limit: limit
-			});
-		};
-		
-		Connection.loadMessagesBetween = function (room, startTimestamp, endTimestamp) {
-			send('messages_between', {
-				room: room,
-				startTimestamp: startTimestamp,
-				endTimestamp: endTimestamp
-			});
-		};
-		
 	}
+	
+	Connection.register = function (username, res) {
+		var ref = send('register', username, id);
+		// add res
+	};
+	
+	Connection.join = function (room) {
+		send('join', room); // also id?
+	};
+	
+	Connection.leave = function (room) {
+		send('leave', room);
+	};
+	
+	Connection.sendMessage = function (room, content) {
+		var id = id();
+		send('message', {
+			room: room,
+			content: content
+		}, id);
+	};
+	
+	Connection.loadMessagesBefore = function (room, timestamp, limit) {
+		var id = id();
+		send('messages_before', {
+			room: room,
+			timestamp: timestamp,
+			limit: limit
+		}, id);
+	};
+	
+	Connection.loadMessagesBetween = function (room, startTimestamp, endTimestamp) {
+		send('messages_between', {
+			room: room,
+			startTimestamp: startTimestamp,
+			endTimestamp: endTimestamp
+		});
+	};
 	
 	// actions
 	
 	var bullet = $.bullet('ws://' + window.document.location.host + '/bullet');
 	
-	var firstOpen = true;
+	/*var firstOpen = true;
 	
 	bullet.onopen = function () {
 		// console.log('bullet: opened');
 		if (firstOpen) {
 			firstOpen = false;
-			installActions();
 			Connection.ready();
 		} else Connection.reconnect();
 	};
@@ -199,13 +265,13 @@ function Connection() {
 	
 	bullet.onclose = function () {
 		console.log('bullet: closed');
-	};
+	};*/
 	
 	bullet.onmessage = function (event) {
 		try {
 			// console.log('received', event.data);
 			var object = JSON.parse(event.data);
-			handle(object.type, object.data);
+			handle(object.type, object.data, object.ref);
 		} catch (error) {
 			console.error('eChat: Unable to handle invalid message', event.data, 'because of error', error);
 		}
