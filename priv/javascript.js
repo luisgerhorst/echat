@@ -4,30 +4,41 @@ $(document).ready(function () {
 	
 	var chat = new Chat(function () { // on ready
 		// allow user to register/show interface
+		
+		chat.username('mark', function (accepted) { // username, on res
+			// accepted?
+			
+			console.info('username mark', accepted);
+			
+		});
+		
+		chat.join('lobby', 5, function (users, messages) { // room name, number of old messages to load, on messages & users received
+			// joined, here are the users
+			
+			console.info('joined', users, messages);
+			
+		}, function (action, username) { // on users change
+			// each time users change
+			// go threw interface html and remove user with matching username
+			console.info('user lobby', action, username);
+		}, function (username, content, timestamp) { // on new message
+			// new message
+			console.info('message lobby', username, content, timestamp);
+		});
+		
+		chat.room('lobby').send('Hi', function (timestamp) { // content, on success and res from server
+			// sent & received, show in interface
+			console.info('mesage res', timestamp);
+		});
+		
+		chat.room('lobby').load(10, function (messages) { // number of old messages to load, on receive
+			// messages requested
+			console.info('load messages', messages);
+		});
+		
+		chat.leave('lobby');
+		
 	});
-	
-	chat.username('mark', function (accepted) { // username, on res
-		// accepted?
-	});
-	
-	chat.join('lobby', 5, function (users, messages) { // room name, number of old messages to load, on messages & users received
-		// joined, here are the users
-	}, function (action, username) { // on users change
-		// each time users change
-		// go threw interface html and remove user with matching username
-	}, function (username, content, timestamp) { // on new message
-		// new message
-	});
-	
-	chat.room('lobby').send('Hi', function (timestamp) { // content, on success and res from server
-		// sent & received, show in interface
-	});
-	
-	chat.room('lobby').load(10, function (messages) { // number of old messages to load, on receive
-		// messages requested
-	});
-	
-	chat.leave('lobby');
 	
 });
 
@@ -36,7 +47,8 @@ function Chat(onReady) {
 	var Chat = this;
 	
 	var onEvent = {},
-		rooms = {};
+		rooms = {},
+		username = null;
 	
 	var bullet = $.bullet('ws://localhost:8080/bullet');
 	
@@ -49,7 +61,7 @@ function Chat(onReady) {
 		
 		try {
 			
-			//console.log('received', event.data);
+			console.log('received', event.data);
 			var object = JSON.parse(event.data);
 			
 			var type = object.type,
@@ -58,36 +70,36 @@ function Chat(onReady) {
 				
 			switch (type) {
 				
-				case 'register_res': // data = { username, accepted }
+				case 'register_res': // data = accepted
 					onEvent[ref](data.accepted);
 					onEvent[ref] = null;
 					break;
 					
-				case 'users': // data = { room, users: [username], action: 'join'|'leave', username} }
-					if (onEvent[ref]) { // after join, callabck set in Chat.join
-						onEvent[ref](data.users);
-						onEvent[ref] = null;
-					} else {
-						Chat.room(data.room).onUser(data.action, data.username, data.users);
-					}
-					break;
-					
-				case 'messages': // data = { room, messages: [{ username, content, timestamp }] }
-					onEvent[ref](data.messages); // defined by Chat.room(name).load(number) or Chat.join(name, number, ...)
+				case 'users': // data = [username] }
+					onEvent[ref](data);
 					onEvent[ref] = null;
 					break;
 					
+				case 'messages': // data = [{ username, content, timestamp }]
+					onEvent[ref](data); // defined by Chat.room(name).load(number) or Chat.join(name, number, ...)
+					onEvent[ref] = null;
+					break;
+					
+				case 'message_timestamp': // data = timestamp
+					onEvent[ref](data);
+					onEvent[ref] = null;
+					break;
+					
+				case 'user': // data = { room, action: 'join'|'leave', username }
+					rooms[data.room].onUser(data.action, data.username);
+					break;
+					
 				case 'message': // data = { room, message: { username, content, timestamp } }
-					if (onEvent[ref]) { // after join, callabck set in Chat.join
-						onEvent[ref](data.message.timestamp);
-						onEvent[ref] = null;
-					} else {
-						Chat.room(data.room).onMessage(data.message.username, data.message.content, data.message.timestamp);
-					}
+					rooms[data.room].onMessage(data.message.username, data.message.content, data.message.timestamp);
 					break;
 					
 				default:
-					throw 'unexpected type';
+					throw 'invalid type';
 					
 			}
 				
@@ -112,6 +124,8 @@ function Chat(onReady) {
 				ref: ref
 		});
 		
+		console.info('sending', json);
+		
 		bullet.send(json);
 		return ref;
 			
@@ -119,46 +133,146 @@ function Chat(onReady) {
 	
 	// api
 	
-	Chat.username = function (name, callback) {
-		var ref = send('register', username);
+	this.username = function (name, callback) {
+		username = name;
+		var ref = send('register', name);
 		onEvent[ref] = callback;
 	};
 	
-	Chat.join = function (room, messagesToLoad, onJoined, onUser, onMessage) {
-		
-		var usersRef = send('join', room); // will return as 'users'
-		var messagesRef = send('messages_before', { // will return as 'messages'
-			room: room,
-			timestamp: Date.now(),
-			limit: toLoad
-		}, id);
-		
-		var toReceive = 2,
-			users = null,
-			messages = null;
-		
-		onEvent[usersRef] = function (newUsers) {
-			users = newUsers;
-			chunkReceived();
-		};
-		
-		onEvent[messagesRef] = function (newMessages) {
-			messages = newMessages;
-			chunkReceived();
-		};
-		
-		function chunkReceived() {
-			toReceive--;
-			if (!toReceive) onJoined(users, messages);
-		}
-		
-		rooms[room] = new Room(room, onUser, onMessage);
-		
+	this.join = function (room, messagesToLoad, onJoined, onUser, onMessage) {
+		rooms[room] = new Room(room, messagesToLoad, onJoined, onUser, onMessage);
 	};
 	
-	// leave
+	this.room = function (name) {
+		return rooms[name];
+	};
 	
-	// Room
+	this.leave = function (room) {
+		send('leave', room);
+		rooms[room] = null;
+	};
+	
+	function Room(room, messagesToLoad, onJoinedCallback, onUserCallback, onMessageCallback) {
+		
+		var messages = [],
+		    users = [];
+		
+		(function (room, limit, callback) {
+		
+			var usersRef = send('join', room); // will return as 'users'
+			var messagesRef = send('messages_before', { // will return as 'messages'
+				room: room,
+				timestamp: Date.now(),
+				limit: limit
+			}, id);
+			
+			var toReceive = 2,
+				usersReceived = null,
+				messagesReceived = null;
+			
+			onEvent[usersRef] = function (newUsers) {
+				usersReceived = newUsers;
+				chunkReceived();
+			};
+			
+			onEvent[messagesRef] = function (newMessages) {
+				messagesReceived = newMessages;
+				chunkReceived();
+			};
+			
+			function chunkReceived() {
+				toReceive--;
+				if (!toReceive) {
+					
+					messages.push(messagesReceived);
+					users.push(usersReceived);
+					
+					callback(usersReceived, messagesReceived);
+					
+				}
+			}
+		
+		})(room, messagesToLoad, onJoinedCallback);
+		
+		// api
+		
+		this.send = function (content, callback) {
+			
+			var ref = send('message', {
+					room: room,
+					content: content
+			});
+			
+			onEvent[ref] = function (timestamp) {
+				
+				messages.push({
+					username: username,
+					content: content,
+					timestamp: timestamp
+				});
+				
+				callback(timestamp);
+				
+			};
+			
+		};
+		
+		this.load = function (limit, callback) {
+			
+			var ref = send('messages_before', {
+					room: room,
+					timestamp: messages[0].timestamp,
+					limit: limit
+			});
+			
+			onEvent[ref] = function (receivedMessages) {
+				messages.push(receivedMessages);
+				callback(receivedMessages);
+			};
+			
+		};
+		
+		// event callbacks
+		
+		this.onUser = function (action, performingUsername) {
+			
+			switch (action) {
+			
+				case 'join':
+					users.push(performingUsername);
+					break;
+					
+				case 'leave':
+					for (var i = users.length; i--;) {
+						if (users[i] === performingUsername) {
+							users.splice(i, 1);
+							i = 0;
+						}
+					}
+					break;
+					
+				default:
+					throw 'invalid action';
+			
+			}
+			
+			onUserCallback(action, performingUsername, users);
+			
+		};
+		
+		this.onMessage = function (username, content, timestamp) {
+			
+			messages.push({
+				username: username,
+				content: content,
+				timestamp: timestamp
+			});
+			
+			onMessageCallback(username, content, timestamp);
+			
+		};
+		
+	}
 	
 }
 

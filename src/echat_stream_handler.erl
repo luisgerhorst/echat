@@ -21,9 +21,10 @@ stream(EncodedData, Req, State) ->
 	try jiffy:decode(EncodedData) of
 		{[
 			{<<"type">>, Type},
-			{<<"data">>, Data}
+			{<<"data">>, Data},
+			{<<"ref">>, Ref}
 		]} ->
-			handle(Type, Data, Req, State);
+			handle(Type, Data, Ref, Req, State);
 		Ejson ->
 			io:format("Parsing message ~p resulted in invalid event ejson ~p~n", [EncodedData, Ejson]),
 			res(none, Req, State)
@@ -80,7 +81,7 @@ terminate(_Req, State) ->
 	
 % handle
 
-handle(<<"register">>, Username, Req, unregistered) when is_binary(Username) ->
+handle(<<"register">>, Username, Ref, Req, unregistered) when is_binary(Username) ->
 	io:format("! Received username req for ~p in connection ~p~n", [Username, self()]),
 	{Accepted, NewState} = register_username(Username),
 	io:format("Accepted ~p, new state ~p~n", [Accepted, NewState]),
@@ -90,11 +91,12 @@ handle(<<"register">>, Username, Req, unregistered) when is_binary(Username) ->
 			{<<"username">>, Username},
 			{<<"accepted">>, Accepted}
 		]},
+		Ref,
 		Req,
 		NewState
 	);
 			
-handle(Type = <<"join">>, Data = RoomMixedCase, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase) ->
+handle(Type = <<"join">>, Data = RoomMixedCase, Ref, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase) ->
 	Room = lowercase(RoomMixedCase),
 	IsMember = lists:member(Room, Rooms),
 	if IsMember ->
@@ -103,8 +105,17 @@ handle(Type = <<"join">>, Data = RoomMixedCase, Req, State = {registered, Userna
 	not IsMember ->
 		io:format("! Connection ~p joins ~p~n", [self(), Room]),
 		echat_room:join(Room, Username),
+		Usernames = [<<"example">>]; % #todo get users of room
+% not checked below
 		res(
-			none,
+			<<"users">>,
+			{[
+				{<<"room">>, Room},
+				{<<"users">>, lists:reverse(Usernames)},
+				{<<"action">>, Action},
+				{<<"username">>, Username}
+			]},
+			Ref,
 			Req,
 			{registered, Username, lists:merge(Rooms, [Room])}
 		)
@@ -129,7 +140,7 @@ handle(Type = <<"leave">>, Data = RoomMixedCase, Req, State = {registered, Usern
 handle(Type = <<"message">>, Data = {[
 	{<<"room">>, RoomMixedCase},
 	{<<"content">>, Content}
-]}, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase), is_binary(Content) ->
+]}, Ref, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase), is_binary(Content) ->
 	Room = lowercase(RoomMixedCase),
 	IsMember = lists:member(Room, Rooms),
 	if not IsMember ->
@@ -137,9 +148,9 @@ handle(Type = <<"message">>, Data = {[
 		res(none, Req, State);
 	IsMember ->
 		io:format("! Message from ~p with content ~p, connection pid ~p~n", [Username, Content, self()]),
-		echat_room:message(Room, Username, Content),
+		Timestamp = echat_room:message(Room, Username, Content), % #todo return timestam
 		res(
-			none,
+			
 			Req,
 			State
 		)
@@ -207,6 +218,14 @@ res(Type, Data, Req, State) when is_binary(Type) ->
 	Res = jiffy:encode({[
 		{<<"type">>, Type},
 		{<<"data">>, Data}
+	]}),
+	{reply, Res, Req, State}.
+	
+res(Type, Data, Ref, Req, State) when is_binary(Type), is_integer(Ref) ->
+	Res = jiffy:encode({[
+		{<<"type">>, Type},
+		{<<"data">>, Data},
+		{<<"ref">>, Ref}
 	]}),
 	{reply, Res, Req, State}.
 
