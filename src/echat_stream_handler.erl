@@ -34,12 +34,13 @@ stream(EncodedData, Req, State) ->
 			res(none, Req, State)
 	end.
 	
-info({members, Room, Usernames, {Action, Username}}, Req, State = {registered, _Username, _Rooms}) ->
+% #todo check if was own action on the following 2
+	
+info({members, Room, _Usernames, {Action, Username}}, Req, State = {registered, _Username, _Rooms}) -> % #todo no usernames
 	res(
-		<<"users">>,
+		<<"user">>,
 		{[
 			{<<"room">>, Room},
-			{<<"users">>, lists:reverse(Usernames)},
 			{<<"action">>, Action},
 			{<<"username">>, Username}
 		]},
@@ -87,10 +88,7 @@ handle(<<"register">>, Username, Ref, Req, unregistered) when is_binary(Username
 	io:format("Accepted ~p, new state ~p~n", [Accepted, NewState]),
 	res(
 		<<"register_res">>,
-		{[
-			{<<"username">>, Username},
-			{<<"accepted">>, Accepted}
-		]},
+		Accepted,
 		Ref,
 		Req,
 		NewState
@@ -104,24 +102,17 @@ handle(Type = <<"join">>, Data = RoomMixedCase, Ref, Req, State = {registered, U
 		res(none, Req, State);
 	not IsMember ->
 		io:format("! Connection ~p joins ~p~n", [self(), Room]),
-		echat_room:join(Room, Username),
-		Usernames = [<<"example">>]; % #todo get users of room
-% not checked below
+		echat_room:join(Room, Username), Usernames = [<<"example">>], % #todo return usernames list
 		res(
 			<<"users">>,
-			{[
-				{<<"room">>, Room},
-				{<<"users">>, lists:reverse(Usernames)},
-				{<<"action">>, Action},
-				{<<"username">>, Username}
-			]},
+			Usernames,
 			Ref,
 			Req,
 			{registered, Username, lists:merge(Rooms, [Room])}
 		)
 	end;
 	
-handle(Type = <<"leave">>, Data = RoomMixedCase, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase) ->
+handle(Type = <<"leave">>, Data = RoomMixedCase, _Ref, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase) ->
 	Room = lowercase(RoomMixedCase),
 	IsMember = lists:member(Room, Rooms),
 	if not IsMember ->
@@ -148,9 +139,11 @@ handle(Type = <<"message">>, Data = {[
 		res(none, Req, State);
 	IsMember ->
 		io:format("! Message from ~p with content ~p, connection pid ~p~n", [Username, Content, self()]),
-		Timestamp = echat_room:message(Room, Username, Content), % #todo return timestam
+		echat_room:message(Room, Username, Content), Timestamp = 0, % #todo return timestamp
 		res(
-			
+			<<"message_timestamp">>,
+			Timestamp,
+			Ref,
 			Req,
 			State
 		)
@@ -160,7 +153,7 @@ handle(Type = <<"messages_before">>, Data = {[
 	{<<"room">>, RoomMixedCase},
 	{<<"timestamp">>, Timestamp}, % load everything before this timestamp
 	{<<"limit">>, Limit}
-]}, Req, State = {registered, _Username, Rooms}) when is_binary(RoomMixedCase), is_number(Timestamp), is_integer(Limit) ->
+]}, Ref, Req, State = {registered, _Username, Rooms}) when is_binary(RoomMixedCase), is_number(Timestamp), is_integer(Limit) ->
 	Room = lowercase(RoomMixedCase),
 	IsMember = lists:member(Room, Rooms),
 	if not IsMember ->
@@ -172,10 +165,8 @@ handle(Type = <<"messages_before">>, Data = {[
 		MessagesEjson = message_tuples_to_ejson(Messages),
 		res(
 			<<"messages">>,
-			{[
-				{<<"room">>, Room},
-				{<<"messages">>, MessagesEjson}
-			]},
+			MessagesEjson,
+			Ref,
 			Req,
 			State
 		)
@@ -185,7 +176,7 @@ handle(Type = <<"messages_between">>, Data = {[
 	{<<"room">>, RoomMixedCase},
 	{<<"startTimestamp">>, StartTimestamp}, % load everything before this timestamp
 	{<<"endTimestamp">>, EndTimestamp}
-]}, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase), is_number(StartTimestamp), is_number(EndTimestamp) ->
+]}, Ref, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase), is_number(StartTimestamp), is_number(EndTimestamp) ->
 	Room = lowercase(RoomMixedCase),
 	IsMember = lists:member(Room, Rooms),
 	if not IsMember ->
@@ -196,18 +187,16 @@ handle(Type = <<"messages_between">>, Data = {[
 		Messages = echat_room:messages_between(Room, StartTimestamp, EndTimestamp),
 		MessagesEjson = message_tuples_to_ejson(Messages),
 		res(
-			<<"messages">>, % custom or unique (with messages_before) event here?
-			{[
-				{<<"room">>, Room},
-				{<<"messages">>, MessagesEjson}
-			]},
+			<<"messages">>,
+			MessagesEjson,
+			Ref,
 			Req,
 			State
 		)
 	end;
 	
-handle(Type, Data, Req, State) ->
-	io:format("Unexpected event ~p with data ~p, State is ~p~n", [Type, Data, State]),
+handle(Type, Data, Ref, Req, State) ->
+	io:format("Unexpected event ~p (ref ~p) with data ~p, State is ~p.~n", [Type, Ref, Data, State]),
 	res(none, Req, State).
 	
 % response

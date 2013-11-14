@@ -2,7 +2,7 @@
 	
 $(document).ready(function () {
 	
-	var chat = new Chat(function () { // on ready
+	window.chat = new Chat(function () { // on ready
 		// allow user to register/show interface
 		
 		chat.username('mark', function (accepted) { // username, on res
@@ -50,12 +50,60 @@ function Chat(onReady) {
 		rooms = {},
 		username = null;
 	
+	// via http://stackoverflow.com/questions/7837456/comparing-two-arrays-in-javascript
+	// attach the .compare method to Array's prototype to call it on any array
+	Array.prototype.compare = function (array) {
+		// if the other array is a falsy value, return
+		if (!array)
+			return false;
+	
+		// compare lengths - can save a lot of time
+		if (this.length != array.length)
+			return false;
+	
+		for (var i = 0; i < this.length; i++) {
+			// Check if we have nested arrays
+			if (this[i] instanceof Array && array[i] instanceof Array) {
+				// recurse into the nested arrays
+				if (!this[i].compare(array[i]))
+					return false;
+			}
+			else if (this[i] != array[i]) {
+				// Warning - two different object instances will never be equal: {x:20} != {x:20}
+				return false;
+			}
+		}
+		return true;
+	};
+	
 	var bullet = $.bullet('ws://localhost:8080/bullet');
 	
-	bullet.onopen = function () {
-		console.log('bullet: opened');
-		onReady();
-	};
+	(function () {
+		
+		var wasRead = false;
+		
+		bullet.onopen = function () {
+			console.log('bullet: opened');
+			if (!wasRead) {
+				onReady();
+				wasRead = true;
+			} else { // reconnect
+				try {
+					
+					Chat.username(username, function (accepted) {
+						if (!accepted) throw 'username not available';
+					});
+					
+					var reconnectTimestamp = Date.now(); // unix in ms for messages between
+					for (var name in rooms) rooms[name].reconnect(reconnectTimestamp);
+					
+				} catch (error) {
+					console.error('eChat: Unable to reconnect because or error', error);
+				}
+			}
+		};
+		
+	})();
 	
 	bullet.onmessage = function (event) {
 		
@@ -71,17 +119,17 @@ function Chat(onReady) {
 			switch (type) {
 				
 				case 'register_res': // data = accepted
-					onEvent[ref](data.accepted);
+					onEvent[ref](data);
 					onEvent[ref] = null;
 					break;
 					
-				case 'users': // data = [username] }
+				case 'users': // data = [username]
 					onEvent[ref](data);
 					onEvent[ref] = null;
 					break;
 					
 				case 'messages': // data = [{ username, content, timestamp }]
-					onEvent[ref](data); // defined by Chat.room(name).load(number) or Chat.join(name, number, ...)
+					onEvent[ref](data);
 					onEvent[ref] = null;
 					break;
 					
@@ -134,9 +182,11 @@ function Chat(onReady) {
 	// api
 	
 	this.username = function (name, callback) {
-		username = name;
 		var ref = send('register', name);
-		onEvent[ref] = callback;
+		onEvent[ref] = function (accepted) {
+			if (accepted) username = name;
+			callback(accepted);
+		};
 	};
 	
 	this.join = function (room, messagesToLoad, onJoined, onUser, onMessage) {
@@ -154,6 +204,8 @@ function Chat(onReady) {
 	
 	function Room(room, messagesToLoad, onJoinedCallback, onUserCallback, onMessageCallback) {
 		
+		var Room = this;
+		
 		var messages = [],
 		    users = [];
 		
@@ -164,7 +216,9 @@ function Chat(onReady) {
 				room: room,
 				timestamp: Date.now(),
 				limit: limit
-			}, id);
+			});
+			
+			// console.log('join refs', usersRef, messagesRef);
 			
 			var toReceive = 2,
 				usersReceived = null,
@@ -179,6 +233,8 @@ function Chat(onReady) {
 				messagesReceived = newMessages;
 				chunkReceived();
 			};
+			
+			// console.log('join handlers defined', onEvent);
 			
 			function chunkReceived() {
 				toReceive--;
@@ -219,6 +275,8 @@ function Chat(onReady) {
 		
 		this.load = function (limit, callback) {
 			
+			console.log('load', messages);
+			
 			var ref = send('messages_before', {
 					room: room,
 					timestamp: messages[0].timestamp,
@@ -233,6 +291,29 @@ function Chat(onReady) {
 		};
 		
 		// event callbacks
+		
+		this.reconnect = function (reconnectTimestamp) {
+			
+			var usersRef = send('join', room);
+			var messagesRef = send('messages_between', {
+				room: room,
+				startTimestamp: messages[messages.length-1].timestamp,
+				endTimestamp: reconnectTimestamp
+			});
+			
+			onEvent[usersRef] = function (newUsers) {
+				// you can fix this, just call onUser for everything that changed. but it's complicated
+				if (!users.compare(newUsers)) throw 'users have changed';
+			};
+			
+			onEvent[messagesRef] = function (newMessages) {
+				for (var i = 0; i < newMessages.length; i++) { // don't reverse
+					var message = newMessages[i];
+					Room.onMessage(message.username, message.content, message.timestamp);
+				}
+			};
+			
+		};
 		
 		this.onUser = function (action, performingUsername) {
 			
