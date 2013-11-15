@@ -1,8 +1,7 @@
 html {
 	background: #eee;
 	font: normal 16px "Helvetica Neue", Arial, Helvetica, sans-serif;
-}
-
-code {
-	background: #bbb;
+	line-height: 16px;
+	padding: 16px;
+	margin: 0;
 }
