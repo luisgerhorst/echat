@@ -1,9 +1,7 @@
 echat
 =====
 
-Web chat JavaScript Framwork built with Erlang.
-
-Create your own web chat interface with a stable and fast Erlang backend.
+Create your own web chat interface with a stable and fast Erlang backend built for you and a easy to use JavaScript framework.
 
 # Usage
 
@@ -55,7 +53,7 @@ You first have to join a room before you can send/receive messages from it.
 
 `10` is the number of messages to load from this room that were sent befor you joined.
 
-The third parameter is a callback function called after receiving the response to the join request. It received the users and an array of the requested messages of the room.
+The third parameter is a callback function called after receiving the response to the join request. It receives the users and an array of the requested messages of the room.
 
 The next callback funtion is called everytime a user joins/leaves the room. It also gets all usernames that are members of the room now.
 
@@ -98,3 +96,7 @@ chat.room('Room Name').load(10, function (messages, allMessages) { // 10: number
 	// loaded
 });
 ```
+
+# Support
+
+If you need help send me a [mail](mailto:luis@luisgerhorst.de).
