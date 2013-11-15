@@ -1,11 +1,11 @@
 echat
 =====
 
-Create your own web chat interface with a stable and fast Erlang backend built for you and a easy to use JavaScript framework.
+Create your own web chat interface with a stable and fast Erlang backend and an easy to use JavaScript library.
 
 # Usage
 
-Start the chat/file server. The file server will deliver all files in the `priv` directory.
+Start the chat server. The file server will deliver all files in the `priv` directory.
 
 ## Load
 
@@ -43,7 +43,7 @@ Before you can send messages or join a chat room you have to register youself wi
 
 ```js
 chat.username('My Name', function (accepted) {
-	// if accepted == false the username is already taken
+	// if accepted is false the username is already taken, choose another one
 });
 ```
 
@@ -55,15 +55,15 @@ You first have to join a room before you can send/receive messages from it.
 
 The third parameter is a callback function called after receiving the response to the join request. It receives the users and an array of the requested messages of the room.
 
-The next callback funtion is called everytime a user joins/leaves the room. It also gets all usernames that are members of the room now.
+The next callback funtion is called everytime a user joins/leaves the room. It also gets an array with all usernames that are members of the room now.
 
-The last argument is a callback function to be called when another user sends a message into this room.
+The last argument is a callback function to be called when another user sends a message into this room. `allMessages` is an array of [message objects](#message-object).
 
 ```js
 chat.join('Room Name', 10, function (users, messages) {
 	// joined
 }, function (action, username, allUsers) {
-	// user change
+	// user joined/left
 }, function (username, content, timestamp, allMessages) {
 	// new message
 });
@@ -89,7 +89,7 @@ chat.room('Room Name').send('Your Message', function (timestamp) {
 
 ## Load Messages
 
-Load messages from the server that were sent before you joined the room, `limit` here set to `10` is the number of messages to load. `messages` is an array of message objects received. `allMessages` are all messages in this room received so far.
+Load messages from the server that were sent before you joined the room, `limit` here set to `10` is the number of messages to load. `messages` is an array of [message objects](#message-object) received. `allMessages` are all messages in this room received so far.
 
 ```js
 chat.room('Room Name').load(10, function (messages, allMessages) { // 10: number of messages to load
