@@ -36,7 +36,6 @@ Before you can send messages or join a chat room you have to register youself wi
 ```js
 chat.username('My Name', function (accepted) {
 	// if accepted == false the username is already taken
-	// when it's true you are ready to join a room
 });
 ```
 
@@ -45,17 +44,24 @@ chat.username('My Name', function (accepted) {
 You first have to join a room before you can send/receive messages of the room.
 
 ```js
-chat.join('Room Name', 10, function (users, messages) { // 10 = Existing messages to load
-	// successfully joined
-	// users: array of usernames that are members of the room, you included
-	// messages: existing messages requested
+chat.join('Room Name', 10, function (users, messages) { // 10: existing messages to load
+	/*
+	-> on successful join
+	users: array of usernames that are members of the room, you included
+	messages: existing messages requested
+	*/
 }, function (action, username, allUsers) {
-	// called when user leaves/joins the room
-	// action is "join" or "leave"
-	// username is the user that performs the action
-	// allUsers is an array of all users that are now in the room
+	/*
+	-> each time a user joins/leaves this room
+	action: "join" or "leave"
+	username: user performing the action
+	allUsers: array of usernames of room members
+	*/
 }, function (username, content, timestamp, allMessages) {
-	// called each time another users sends a message into this room
-	
+	/*
+	-> each time another user sends a message into this room
+	timestamp: unix timestamp in ms, is a float
+	allMessages: array of so far loaded messages of this room
+	*/
 });
 ```
