@@ -1,7 +1,7 @@
 -module(echat_room_manager).
 -behaviour(gen_server).
 
--export([start_link/1, get_pid/1]).
+-export([start_link/1, pid/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 % api
@@ -15,7 +15,7 @@ start_link(Sup) ->
 	io:format("Room manager started.~n"),
 	{ok, Pid}.
 	
-get_pid(Name) ->
+pid(Name) ->
 	io:format("Pid for ~p requested.~n", [Name]),
 	gen_server:call(whereis(echat_room_manager), {get_room, Name}).
 

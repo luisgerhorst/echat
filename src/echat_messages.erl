@@ -1,6 +1,6 @@
 -module(echat_messages).
 
--export([start/0, new/3, convert_to_relative_tuple/1, save/1, before/3, between/3]).
+-export([start/0, new/3, convert_to_relative_tuple/1, timestamp/1, save/1, before/3, between/3]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 
@@ -54,6 +54,9 @@ timestamp_ms() ->
 
 convert_to_relative_tuple({_Room, Username, Content, Timestamp}) ->
 	{Username, Content, Timestamp}. % you can use this
+	
+timestamp({_Room, _Username, _Content, Timestamp}) ->
+	Timestamp.
 	
 % read/write
 

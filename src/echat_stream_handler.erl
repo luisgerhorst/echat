@@ -1,6 +1,6 @@
 -module(echat_stream_handler).
 
--export([new_message/3, members_change/4]).
+-export([new_message/3, members_change/3]).
 -export([init/4, stream/3, info/3, terminate/2]).
 
 % api
@@ -8,14 +8,15 @@
 new_message(Pid, Room, Message) ->
 	Pid ! {message, Room, Message}.
 	
-members_change(Pid, Room, Usernames, Action) ->
-	Pid ! {members, Room, Usernames, Action}.
+members_change(Pid, Room, Action) ->
+	io:format("members change: pid ~p room ~p action ~p~n", [Pid, Room, Action]),
+	Pid ! {members, Room, Action}.
 
 % receive
 
 init(_Transport, Req, _Opts, _Active) ->
 	io:format("! New connection ~p~n", [self()]),
-	{ok, Req, unregistered}. % State: {UserID, Nickname, Rooms}
+	{ok, Req, unregistered}.
 
 stream(EncodedData, Req, State) ->
 	try jiffy:decode(EncodedData) of
@@ -34,9 +35,7 @@ stream(EncodedData, Req, State) ->
 			res(none, Req, State)
 	end.
 	
-% #todo check if was own action on the following 2
-	
-info({members, Room, _Usernames, {Action, Username}}, Req, State = {registered, _Username, _Rooms}) -> % #todo no usernames
+info({members, Room, {Action, Username}}, Req, State = {registered, _Username, _Rooms}) ->
 	res(
 		<<"user">>,
 		{[
@@ -102,7 +101,7 @@ handle(Type = <<"join">>, Data = RoomMixedCase, Ref, Req, State = {registered, U
 		res(none, Req, State);
 	not IsMember ->
 		io:format("! Connection ~p joins ~p~n", [self(), Room]),
-		echat_room:join(Room, Username), Usernames = [<<"example">>], % #todo return usernames list
+		Usernames = echat_room:join(Room, Username),
 		res(
 			<<"users">>,
 			Usernames,
@@ -139,7 +138,7 @@ handle(Type = <<"message">>, Data = {[
 		res(none, Req, State);
 	IsMember ->
 		io:format("! Message from ~p with content ~p, connection pid ~p~n", [Username, Content, self()]),
-		echat_room:message(Room, Username, Content), Timestamp = 0, % #todo return timestamp
+		Timestamp = echat_room:message(Room, Username, Content),
 		res(
 			<<"message_timestamp">>,
 			Timestamp,
@@ -174,7 +173,7 @@ handle(Type = <<"messages_before">>, Data = {[
 	
 handle(Type = <<"messages_between">>, Data = {[
 	{<<"room">>, RoomMixedCase},
-	{<<"startTimestamp">>, StartTimestamp}, % load everything before this timestamp
+	{<<"startTimestamp">>, StartTimestamp},
 	{<<"endTimestamp">>, EndTimestamp}
 ]}, Ref, Req, State = {registered, Username, Rooms}) when is_binary(RoomMixedCase), is_number(StartTimestamp), is_number(EndTimestamp) ->
 	Room = lowercase(RoomMixedCase),

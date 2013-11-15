@@ -1,46 +1,10 @@
 (function () {
 	
-$(document).ready(function () {
+window.echat = function (onReady) {
 	
-	window.chat = new Chat(function () { // on ready
-		// allow user to register/show interface
-		
-		chat.username('mark', function (accepted) { // username, on res
-			// accepted?
-			
-			console.info('username mark', accepted);
-			
-		});
-		
-		chat.join('lobby', 5, function (users, messages) { // room name, number of old messages to load, on messages & users received
-			// joined, here are the users
-			
-			console.info('joined', users, messages);
-			
-		}, function (action, username) { // on users change
-			// each time users change
-			// go threw interface html and remove user with matching username
-			console.info('user lobby', action, username);
-		}, function (username, content, timestamp) { // on new message
-			// new message
-			console.info('message lobby', username, content, timestamp);
-		});
-		
-		chat.room('lobby').send('Hi', function (timestamp) { // content, on success and res from server
-			// sent & received, show in interface
-			console.info('mesage res', timestamp);
-		});
-		
-		chat.room('lobby').load(10, function (messages) { // number of old messages to load, on receive
-			// messages requested
-			console.info('load messages', messages);
-		});
-		
-		chat.leave('lobby');
-		
-	});
+	return new Chat(onReady);
 	
-});
+};
 
 function Chat(onReady) {
 	
@@ -50,32 +14,6 @@ function Chat(onReady) {
 		rooms = {},
 		username = null;
 	
-	// via http://stackoverflow.com/questions/7837456/comparing-two-arrays-in-javascript
-	// attach the .compare method to Array's prototype to call it on any array
-	Array.prototype.compare = function (array) {
-		// if the other array is a falsy value, return
-		if (!array)
-			return false;
-	
-		// compare lengths - can save a lot of time
-		if (this.length != array.length)
-			return false;
-	
-		for (var i = 0; i < this.length; i++) {
-			// Check if we have nested arrays
-			if (this[i] instanceof Array && array[i] instanceof Array) {
-				// recurse into the nested arrays
-				if (!this[i].compare(array[i]))
-					return false;
-			}
-			else if (this[i] != array[i]) {
-				// Warning - two different object instances will never be equal: {x:20} != {x:20}
-				return false;
-			}
-		}
-		return true;
-	};
-	
 	var bullet = $.bullet('ws://localhost:8080/bullet');
 	
 	(function () {
@@ -83,7 +21,7 @@ function Chat(onReady) {
 		var wasRead = false;
 		
 		bullet.onopen = function () {
-			console.log('bullet: opened');
+			// console.log('bullet: opened');
 			if (!wasRead) {
 				onReady();
 				wasRead = true;
@@ -109,7 +47,7 @@ function Chat(onReady) {
 		
 		try {
 			
-			console.log('received', event.data);
+			// console.log('received', event.data);
 			var object = JSON.parse(event.data);
 			
 			var type = object.type,
@@ -172,7 +110,7 @@ function Chat(onReady) {
 				ref: ref
 		});
 		
-		console.info('sending', json);
+		// console.info('sending', json);
 		
 		bullet.send(json);
 		return ref;
@@ -206,19 +144,17 @@ function Chat(onReady) {
 		
 		var Room = this;
 		
-		var messages = [],
-		    users = [];
+		Room.messages = [];
+		Room.users = [];
 		
 		(function (room, limit, callback) {
 		
-			var usersRef = send('join', room); // will return as 'users'
-			var messagesRef = send('messages_before', { // will return as 'messages'
+			var usersRef = send('join', room); // will return as 'Room.users'
+			var messagesRef = send('messages_before', { // will return as 'Room.messages'
 				room: room,
 				timestamp: Date.now(),
 				limit: limit
 			});
-			
-			// console.log('join refs', usersRef, messagesRef);
 			
 			var toReceive = 2,
 				usersReceived = null,
@@ -234,14 +170,12 @@ function Chat(onReady) {
 				chunkReceived();
 			};
 			
-			// console.log('join handlers defined', onEvent);
-			
 			function chunkReceived() {
 				toReceive--;
 				if (!toReceive) {
 					
-					messages.push(messagesReceived);
-					users.push(usersReceived);
+					Room.messages = messagesReceived;
+					Room.users = usersReceived;
 					
 					callback(usersReceived, messagesReceived);
 					
@@ -261,7 +195,7 @@ function Chat(onReady) {
 			
 			onEvent[ref] = function (timestamp) {
 				
-				messages.push({
+				Room.messages.push({
 					username: username,
 					content: content,
 					timestamp: timestamp
@@ -275,17 +209,16 @@ function Chat(onReady) {
 		
 		this.load = function (limit, callback) {
 			
-			console.log('load', messages);
-			
 			var ref = send('messages_before', {
 					room: room,
-					timestamp: messages[0].timestamp,
+					timestamp: Room.messages[0].timestamp,
 					limit: limit
 			});
 			
 			onEvent[ref] = function (receivedMessages) {
-				messages.push(receivedMessages);
-				callback(receivedMessages);
+				Room.messages = Room.messages.concat(receivedMessages);
+				console.log('load:', Room.messages, receivedMessages);
+				callback(receivedMessages, Room.messages);
 			};
 			
 		};
@@ -295,23 +228,45 @@ function Chat(onReady) {
 		this.reconnect = function (reconnectTimestamp) {
 			
 			var usersRef = send('join', room);
-			var messagesRef = send('messages_between', {
-				room: room,
-				startTimestamp: messages[messages.length-1].timestamp,
-				endTimestamp: reconnectTimestamp
-			});
 			
-			onEvent[usersRef] = function (newUsers) {
-				// you can fix this, just call onUser for everything that changed. but it's complicated
-				if (!users.compare(newUsers)) throw 'users have changed';
-			};
-			
-			onEvent[messagesRef] = function (newMessages) {
-				for (var i = 0; i < newMessages.length; i++) { // don't reverse
-					var message = newMessages[i];
-					Room.onMessage(message.username, message.content, message.timestamp);
+			onEvent[usersRef] = function (newUsers) { // detects waht users joined/left the room while disconenct
+				
+				var n = newUsers,
+				    o = Room.users;
+				    
+				for (var i = o.length; i--;) { // go threw old
+					var u = o[i];
+					if (n.indexOf(u) === -1) { // user doesn't exist anymore -> left
+						Room.onUser('leave', u);
+					}
 				}
+				    
+				for (var i = n.length; i--;) { // go threw new
+					var u = n[i];
+					if (o.indexOf(n[i]) === -1) { // user didn't exist before -> joined
+						Room.onUser('join', u);
+					}
+				}
+				
 			};
+			
+			if (Room.messages.length) { // if messages already loaded
+				
+				var messagesRef = send('messages_between', {
+					room: room,
+					startTimestamp: Room.messages[Room.messages.length-1].timestamp,
+					endTimestamp: reconnectTimestamp
+				});
+				
+				onEvent[messagesRef] = function (newMessages) {
+					Room.messages = Room.messages.concat(newMessages);
+					for (var i = 0; i < newMessages.length; i++) { // don't reverse
+						var message = newMessages[i];
+						Room.onMessage(message.username, message.content, message.timestamp);
+					}
+				};
+				
+			}
 			
 		};
 		
@@ -320,13 +275,13 @@ function Chat(onReady) {
 			switch (action) {
 			
 				case 'join':
-					users.push(performingUsername);
+					Room.users.push(performingUsername);
 					break;
 					
 				case 'leave':
-					for (var i = users.length; i--;) {
-						if (users[i] === performingUsername) {
-							users.splice(i, 1);
+					for (var i = Room.users.length; i--;) {
+						if (Room.users[i] === performingUsername) {
+							Room.users.splice(i, 1);
 							i = 0;
 						}
 					}
@@ -337,19 +292,19 @@ function Chat(onReady) {
 			
 			}
 			
-			onUserCallback(action, performingUsername, users);
+			onUserCallback(action, performingUsername, Room.users);
 			
 		};
 		
 		this.onMessage = function (username, content, timestamp) {
 			
-			messages.push({
+			Room.messages.push({
 				username: username,
 				content: content,
 				timestamp: timestamp
 			});
 			
-			onMessageCallback(username, content, timestamp);
+			onMessageCallback(username, content, timestamp, Room.messages);
 			
 		};
 		
