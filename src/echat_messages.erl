@@ -12,36 +12,43 @@
 }).
 
 -define(NODES, [node()]).
+-define(TABLE_NAME, messages).
 
 % start
 
 start() ->
-	try
-		io:format("Trying to create a mnesia table for messages ...~n"),
-		create()
-	catch _Exception:_Reason ->
-		io:format("Error, will load existing mnesia table for messages.~n"),
-		load()
-	end.
-
-create() ->
-	ok = mnesia:create_schema(?NODES),
-	ok = application:start(mnesia),
-	mnesia:create_table(
-		messages,
-		[
-			{attributes, record_info(fields, messages)},
-			{disc_copies, ?NODES},
-			{type, bag}
-		]
-	),
-	mnesia:wait_for_tables([messages], 10000),
-	ok.
-
-load() ->
-	application:start(mnesia),
-	mnesia:wait_for_tables([messages], 10000),
-	ok.
+	
+	case mnesia:create_schema(?NODES) of
+		ok -> io:format("Mnesia schema created.~n");
+		{error, {_, {already_exists, _}}} -> io:format("Mnesia schema already exists.~n");
+		{error, SchemaReason} -> io:format("Error: Unable to create Mnesia schema because of reason ~p~n", [SchemaReason])
+	end,
+	
+	case application:start(mnesia) of
+		ok -> io:format("Mnesia started.~n");
+		{error, {already_started, mnesia}} -> io:format("Mnesia already running.~n");
+		{error, StartReason} -> io:format("Error: Unable to start Mnesia because of reason ~p~n", [StartReason])
+	end,
+	
+	case
+		mnesia:create_table(
+			?TABLE_NAME,
+			[
+				{attributes, record_info(fields, messages)},
+				{disc_copies, ?NODES},
+				{type, bag}
+			]
+		)
+	of
+		{atomic, ok} ->
+			io:format("Mnesia table for messages created.~n");
+		{aborted, {already_exists, ?TABLE_NAME}} ->
+			io:format("Mnesia table for messages already exists.~n");
+		{aborted, TableReason} ->
+			io:format("Error: Unable to create table because of reason ~p~n", TableReason)
+	end,
+	
+	ok = mnesia:wait_for_tables([?TABLE_NAME], 10000). % required
 	
 % data
 	
@@ -84,7 +91,7 @@ before(SearchedRoom, BeforeTimestamp, Limit) -> % faster?
 				}) when Room =:= SearchedRoom, Timestamp < BeforeTimestamp ->
 					{Username, Content, Timestamp}
 		end),
-		mnesia:select(messages, Match)
+		mnesia:select(?TABLE_NAME, Match)
 	end,
 	MessagesBefore = lists:reverse(mnesia:activity(transaction, Fun)), % before timestamp, newest first
 	MessagesLimited = case Limit > length(MessagesBefore) of
@@ -109,7 +116,7 @@ between(SearchedRoom, StartTimestamp, EndTimestamp) ->
 				}) when Room =:= SearchedRoom, StartTimestamp < Timestamp, Timestamp < EndTimestamp ->
 					{Username, Content, Timestamp}
 		end),
-		mnesia:select(messages, Match)
+		mnesia:select(?TABLE_NAME, Match)
 	end,
 	mnesia:activity(transaction, Fun).
 

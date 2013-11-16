@@ -12,9 +12,6 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    ok = application:start(crypto),
-    ok = application:start(ranch),
-    ok = application:start(cowboy),
     Dispatch = cowboy_router:compile([
         {'_', [
             {"/bullet", bullet_handler, [{handler, echat_stream_handler}]},
@@ -29,11 +26,7 @@ start(_StartType, _StartArgs) ->
                 {mimetypes, [{<<".html">>, [<<"text/html">>]}]}
             ]},
             {"/[...]", cowboy_static, [
-                {directory, {priv_dir, echat, []}},
-                {mimetypes, [
-                    {<<".js">>, [<<"text/javascript">>]},
-                    {<<".css">>, [<<"text/css">>]}
-                ]}
+                {directory, {priv_dir, echat, []}}
             ]}
         ]}
     ]),

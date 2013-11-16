@@ -5,11 +5,19 @@ Create your own web chat interface with a stable and fast Erlang backend and an 
 
 # Usage
 
-Start the chat server. The file server will deliver all files in the `priv` directory.
+## Start
 
-## Load
+To compile and run the app you need `rebar` and `erl` installed.
 
-Copy this into your chat's html file to load the required JavaScript frameworks.
+1. Load the dependencies with `rebar get-deps`
+2. Compile with `rebar compile`
+3. Start the app with `erl -pa ebin deps/*/ebin` and `echat:start().`
+
+The app has a built-in file server that delivers all files in the `priv` directory.
+
+## HTML
+
+Copy this into your html file to load the required JavaScript frameworks.
 
 ```html
 <script src="/jquery-2.0.3.min.js"></script>

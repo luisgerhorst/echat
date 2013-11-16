@@ -3,13 +3,13 @@
     echat,
     [
         {description, ""},
-        {vsn, "1"},
-        {registered, [echat_sup]},
+        {vsn, "1.0"},
+        {registered, [echat_room_manager]},
         {applications, [
             kernel,
-            stdlib
-        ]},
-        {mod, {echat_app, []}},
-        {env, []}
+            stdlib,
+            cowboy
+        ]}, % all other required apps will be started inside
+        {mod, {echat_app, []}}
     ]
 }.
