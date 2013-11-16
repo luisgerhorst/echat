@@ -11,10 +11,10 @@ function Chat(onReady) {
 	var Chat = this;
 	
 	var onEvent = {},
-		rooms = {},
-		username = null;
+	    rooms = {},
+	    username = null;
 	
-	var bullet = $.bullet('ws://localhost:8080/bullet');
+	var bullet = $.bullet('ws://' + window.document.location.host + '/bullet');
 	
 	(function () {
 		
@@ -26,6 +26,7 @@ function Chat(onReady) {
 				onReady();
 				wasRead = true;
 			} else { // reconnect
+				
 				try {
 					
 					Chat.username(username, function (accepted) {
@@ -36,8 +37,11 @@ function Chat(onReady) {
 					for (var name in rooms) rooms[name].reconnect(reconnectTimestamp);
 					
 				} catch (error) {
+					
 					console.error('eChat: Unable to reconnect because or error', error);
+					
 				}
+				
 			}
 		};
 		
@@ -51,8 +55,8 @@ function Chat(onReady) {
 			var object = JSON.parse(event.data);
 			
 			var type = object.type,
-				data = object.data,
-				ref = object.ref;
+			    data = object.data,
+			    ref = object.ref;
 				
 			switch (type) {
 				
@@ -105,9 +109,9 @@ function Chat(onReady) {
 			
 		var ref = newRef();
 		var json = JSON.stringify({
-				type: type,
-				data: data,
-				ref: ref
+			type: type,
+			data: data,
+			ref: ref
 		});
 		
 		// console.info('sending', json);
@@ -157,8 +161,8 @@ function Chat(onReady) {
 			});
 			
 			var toReceive = 2,
-				usersReceived = null,
-				messagesReceived = null;
+			    usersReceived = null,
+			    messagesReceived = null;
 			
 			onEvent[usersRef] = function (newUsers) {
 				usersReceived = newUsers;
@@ -189,8 +193,8 @@ function Chat(onReady) {
 		this.send = function (content, callback) {
 			
 			var ref = send('message', {
-					room: room,
-					content: content
+				room: room,
+				content: content
 			});
 			
 			onEvent[ref] = function (timestamp) {
@@ -217,7 +221,7 @@ function Chat(onReady) {
 			
 			onEvent[ref] = function (receivedMessages) {
 				Room.messages = Room.messages.concat(receivedMessages);
-				console.log('load:', Room.messages, receivedMessages);
+				// console.log('load:', Room.messages, receivedMessages);
 				callback(receivedMessages, Room.messages);
 			};
 			
