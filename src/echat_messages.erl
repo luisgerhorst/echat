@@ -26,7 +26,7 @@ start() ->
 
 create() ->
 	ok = mnesia:create_schema(?NODES),
-	application:start(mnesia),
+	ok = application:start(mnesia),
 	mnesia:create_table(
 		messages,
 		[
@@ -35,12 +35,12 @@ create() ->
 			{type, bag}
 		]
 	),
-	mnesia:wait_for_tables([messages], 5000),
+	mnesia:wait_for_tables([messages], 10000),
 	ok.
 
 load() ->
 	application:start(mnesia),
-	mnesia:wait_for_tables([messages], 5000),
+	mnesia:wait_for_tables([messages], 10000),
 	ok.
 	
 % data

@@ -25,7 +25,7 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, {{one_for_one, 1, 1}, [
+    {ok, {{one_for_one, 5, 10}, [
         {
             room_manager,
             {echat_room_manager, start_link, [self()]},
