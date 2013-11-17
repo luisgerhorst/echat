@@ -10,7 +10,7 @@ start() ->
 	ok = application:start(ranch),
 	ok = application:start(cowboy),
 	ok = application:start(echat).
-	
+
 stop() ->
 	ok = application:stop(echat),
 	ok = application:stop(mnesia),
