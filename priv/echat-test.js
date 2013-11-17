@@ -1,3 +1,15 @@
+/*
+
+API:
+
+start test mode:
+_startTest();
+
+test api:
+test.method();
+
+*/
+
 $(document).ready(function () {
 
 	window._startTest = function () {

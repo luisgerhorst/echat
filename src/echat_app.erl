@@ -26,7 +26,12 @@ start(_StartType, []) ->
                 {mimetypes, [{<<".html">>, [<<"text/html">>]}]}
             ]},
             {"/[...]", cowboy_static, [
-                {directory, {priv_dir, echat, []}}
+                {directory, {priv_dir, echat, []}},
+                {mimetypes, [
+                    {<<".html">>, [<<"text/html">>]},
+                    {<<".js">>, [<<"text/javascript">>]},
+                    {<<".css">>, [<<"text/css">>]}
+                ]}
             ]}
         ]}
     ]),
