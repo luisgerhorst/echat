@@ -11,7 +11,7 @@
 %% Application callbacks
 %% ===================================================================
 
-start(_StartType, _StartArgs) ->
+start(_StartType, []) ->
     Dispatch = cowboy_router:compile([
         {'_', [
             {"/bullet", bullet_handler, [{handler, echat_stream_handler}]},

@@ -7,13 +7,19 @@ Create your own web chat interface with a stable and fast Erlang backend and an 
 
 ## Start
 
-To compile and run the app you need `rebar` and `erl` installed.
+To compile and run the app you need `rebar` and `erl`.
 
 1. Load the dependencies with `rebar get-deps`
 2. Compile with `rebar compile`
-3. Start the app with `erl -pa ebin deps/*/ebin` and `echat:start().`
+3. Start the app with `erl -pa ebin deps/*/ebin -s echat start`
 
 The app has a built-in file server that delivers all files in the `priv` directory.
+
+### Config
+
+**Port:** `src/echat_app.erl:3`
+
+Make sure you recompile and restart the app.
 
 ## HTML
 
