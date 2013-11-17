@@ -119,4 +119,3 @@ between(SearchedRoom, StartTimestamp, EndTimestamp) ->
 		mnesia:select(?TABLE_NAME, Match)
 	end,
 	mnesia:activity(transaction, Fun).
-

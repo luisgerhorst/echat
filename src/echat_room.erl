@@ -3,7 +3,7 @@
 
 -export([
 	start_link/1,
-	join/2, leave/2, unsubscribe/2, reconnect_timeout/2,
+	join/2, leave/2, disconnected/2, reconnect_timeout/2,
 	message/3, messages_before/3, messages_between/3
 ]).
 
@@ -27,7 +27,7 @@ join(Room, Username) ->
 leave(Room, Username) ->
 	gen_server:cast(echat_room_manager:pid(Room), {leave, Username}).
 	
-unsubscribe(Room, Username) ->
+disconnected(Room, Username) ->
 	gen_server:cast(echat_room_manager:pid(Room), {disconnected, Username}).
 	
 reconnect_timeout(RoomPid, Username) ->
@@ -239,7 +239,7 @@ send_message(Room, Members, Message) ->
 	each_member_pid(fun (Pid, Username) ->
 		if
 			SenderUsername =:= Username -> ok;
-			true -> echat_stream_handler:new_message(Pid, Room, RelativeMessage)
+			true -> echat_connection:message(Pid, Room, RelativeMessage)
 		end
 	end, Members).
 	
@@ -247,7 +247,7 @@ send_user(Room, Members, Action = {_Type, PerformingUsername}) ->
 	each_member_pid(fun (Pid, Username) ->
 		if
 			PerformingUsername =:= Username -> ok;
-			true -> echat_stream_handler:members_change(Pid, Room, Action)
+			true -> echat_connection:user(Pid, Room, Action)
 		end
 	end, Members).
 	
