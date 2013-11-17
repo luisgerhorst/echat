@@ -11,9 +11,10 @@ To compile and run the app you need `rebar` and `erl`.
 
 1. Load the dependencies with `rebar get-deps`
 2. Compile with `rebar compile`
-3. Start the app with `erl -pa ebin deps/*/ebin -s echat start`
+3. Open the erlang shell with `erl -pa ebin deps/*/ebin`
+4. Start with `echat:start().` and stop with `echat:stop().`
 
-The app has a built-in file server that delivers all files in the `priv` directory.
+The app has a built-in file server that delivers all files in the `priv` directory, default port is `8080`.
 
 ### Config
 
