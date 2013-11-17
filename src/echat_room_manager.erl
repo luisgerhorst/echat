@@ -53,21 +53,21 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 get_pid(SearchedName, RoomSup) ->
 	Rooms = supervisor:which_children(RoomSup),
-	FoundPid = lists:foldl(fun ({{room, Name}, Pid, _Type, _CallbackMod}, Contains) ->
+	Found = lists:foldl(fun ({{room, Name}, Pid, _Type, _CallbackMod}, Contains) ->
 		if
 			Name =:= SearchedName -> Pid;
 			true -> Contains
 		end
 	end, false, Rooms),
-	io:format("Room manager found room with matching name: ~p~n", [FoundPid]),
-	case FoundPid of
-		FoundPid when is_pid(FoundPid) -> % exists
-			FoundPid;
+	io:format("Room manager found room with matching name: ~p~n", [Found]),
+	case Found of
+		Pid when is_pid(Found) -> % exists
+			Pid;
 		undefined -> % has already existed but was terminated
 			{ok, RestartedPid} = supervisor:restart_child(RoomSup, {room, SearchedName}),
 			RestartedPid;
-		FoundPid -> % never existed
-			io:format("no process for room ~p found in sup children ~p (just found ~p)~n", [SearchedName, Rooms, FoundPid]),
+		_NotFound -> % never existed
+			io:format("no process for room ~p found in sup children ~p (just found ~p)~n", [SearchedName, Rooms, Found]),
 			{ok, CreatedPid} = supervisor:start_child(RoomSup, {
 				{room, SearchedName},
 				{echat_room, start_link, [SearchedName]},
