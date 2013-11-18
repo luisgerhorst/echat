@@ -9,7 +9,9 @@
             kernel,
             stdlib,
             cowboy
-        ]}, % all other required apps will be started inside
-        {mod, {echat_app, []}}
+        ]},
+        {mod, {echat_app, [
+            % config?
+        ]}}
     ]
 }.

@@ -3,6 +3,8 @@ echat
 
 Create your own web chat interface with a stable and fast Erlang backend and an easy to use JavaScript library.
 
+[![Build Status](https://travis-ci.org/luisgerhorst/echat.png?branch=master)](https://travis-ci.org/luisgerhorst/echat)
+
 # Usage
 
 ## Start
@@ -115,3 +117,8 @@ chat.room('Room Name').load(10, function (messages, allMessages) { // 10: number
 # Support
 
 If you need help send me a [mail](mailto:luis@luisgerhorst.de).
+
+# Todo
+
+- Fix Cowboy version (check `rebar.config`), then change `echat_app.erl`
+- Easy install & run with *relx*
