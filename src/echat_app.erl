@@ -15,11 +15,6 @@ start(_StartType, []) ->
     Dispatch = cowboy_router:compile([
         {'_', [
             {"/bullet", bullet_handler, [{handler, echat_stream_handler}]},
-            {"/bullet.js", cowboy_static, [
-                {directory, {priv_dir, bullet, []}},
-                {file, "bullet.js"},
-                {mimetypes, [{<<".js">>, [<<"text/javascript">>]}]}
-            ]},
             {"/", cowboy_static, [
                 {directory, {priv_dir, echat, []}},
                 {file, "index.html"},
