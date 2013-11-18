@@ -2,19 +2,19 @@
     application,
     echat,
     [
-        {description, ""},
+        {description, "Web chat server."},
         {vsn, git},
         {env, [
             {port, 8222}
         ]},
-        {registered, [echat_room_manager]},
         {applications, [
             kernel,
             stdlib,
-            jiffy,
             cowboy,
-            bullet
+            bullet,
+            jiffy
         ]},
+        {registered, [echat_room_manager]},
         {mod, {echat_app, []}}
     ]
 }.
