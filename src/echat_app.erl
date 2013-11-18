@@ -15,22 +15,12 @@ start(_StartType, []) ->
     Dispatch = cowboy_router:compile([
         {'_', [
             {"/bullet", bullet_handler, [{handler, echat_stream_handler}]},
-            {"/", cowboy_static, [
-                {directory, {priv_dir, echat, []}},
-                {file, "index.html"},
-                {mimetypes, [{<<".html">>, [<<"text/html">>]}]}
-            ]},
-            {"/[...]", cowboy_static, [
-                {directory, {priv_dir, echat, []}},
-                {mimetypes, [
-                    {<<".html">>, [<<"text/html">>]},
-                    {<<".js">>, [<<"text/javascript">>]},
-                    {<<".css">>, [<<"text/css">>]}
-                ]}
-            ]}
+            {"/", cowboy_static, {priv_file, echat, "index.html"}},
+            {"/[...]", cowboy_static, {priv_dir, echat, ""}}
         ]}
     ]),
-    {ok, _} = cowboy:start_http(http, 100, [{port, ?PORT}], [{env, [{dispatch, Dispatch}]}]),
+    {ok, Port} = application:get_env(port),
+    {ok, _} = cowboy:start_http(http, 100, [{port, Port}], [{env, [{dispatch, Dispatch}]}]),
     ets:new(usernames, [set, public, named_table]),
     echat_messages:start(),
     echat_sup:start_link(). % start manager, do stuff above in manager and send manager's pid to each handler's init

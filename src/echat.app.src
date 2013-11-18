@@ -4,14 +4,17 @@
     [
         {description, ""},
         {vsn, git},
+        {env, [
+            {port, 8222}
+        ]},
         {registered, [echat_room_manager]},
         {applications, [
             kernel,
             stdlib,
-            cowboy
+            jiffy,
+            cowboy,
+            bullet
         ]},
-        {mod, {echat_app, [
-            % config?
-        ]}}
+        {mod, {echat_app, []}}
     ]
 }.
