@@ -3,9 +3,9 @@
     echat,
     [
         {description, "Web chat server."},
-        {vsn, git},
+        {vsn, "1.0.0"},
         {env, [
-            {port, 8222}
+            {port, 8222} % http server port, you can change it!
         ]},
         {applications, [
             kernel,
