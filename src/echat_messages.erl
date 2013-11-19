@@ -21,7 +21,7 @@ start() ->
 	case mnesia:create_schema(?NODES) of
 		ok -> io:format("Mnesia schema created.~n");
 		{error, {_, {already_exists, _}}} -> io:format("Mnesia schema already exists.~n");
-		{error, SchemaReason} -> io:format("Error: Unable to create Mnesia schema because of reason ~p~n", [SchemaReason])
+		SchemaError -> io:format("Error: Unable to create Mnesia schema because of reason ~p~n", [SchemaError])
 	end,
 	
 	case application:start(mnesia) of

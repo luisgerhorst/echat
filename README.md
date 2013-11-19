@@ -9,8 +9,6 @@ Create your own web chat interface with a stable and fast Erlang backend and an 
 
 ## Start
 
-There's a `relx.config` but it **doesn't work** yet. Do this:
-
 To compile and run the app you need `rebar` and `erl`.
 
 1. Load the dependencies with `rebar get-deps`

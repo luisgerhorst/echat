@@ -3,13 +3,14 @@
     echat,
     [
         {description, "Web chat server."},
-        {vsn, "1.0.0"},
+        {vsn, "1"},
         {env, [
             {port, 8222} % http server port, you can change it!
         ]},
         {applications, [
             kernel,
             stdlib,
+            mnesia,
             cowboy,
             bullet,
             jiffy
