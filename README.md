@@ -120,5 +120,5 @@ If you need help send me a [mail](mailto:luis@luisgerhorst.de).
 
 # Todo
 
-- Fix Cowboy version (check `rebar.config`), then change `echat_app.erl`
 - Easy install & run with *relx*
+- Example Interface
