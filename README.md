@@ -21,7 +21,7 @@ Copy this into your html file to load the required JavaScript frameworks.
 
 ```html
 <script src="/jquery-2.0.3.min.js"></script>
-<script src="/bullet.js"></script> <!-- backend magic delivers this file -->
+<script src="/bullet.js"></script>
 <script src="/echat.js"></script>
 ```
 
