@@ -9,13 +9,11 @@ Create your own web chat interface with a stable and fast Erlang backend and an 
 
 ## Start
 
-To compile and run the app you need `rebar` and `erl`.
-
 1. Load dependencies and compile with `rebar get-deps compile`
 3. Open the erlang shell with `erl -pa ebin deps/*/ebin -env ERL_LIBS .`
 4. Start with `echat:start().` and stop with `echat:stop().`
 
-The app has a built-in file server that delivers all files in the `priv` directory, default port is `8222` (can be changed in `src/echat.app.src:8`, recompile afterwards).
+The app has a built-in file server that delivers all files in the `priv` directory, default port is `8222` (can be changed in `src/echat.app.src:8`, recompile after change).
 
 ## HTML
 
