@@ -10,10 +10,7 @@
         {applications, [
             kernel,
             stdlib,
-            mnesia,
-            cowboy,
-            bullet,
-            jiffy
+            cowboy
         ]},
         {registered, [echat_room_manager]},
         {mod, {echat_app, []}}
