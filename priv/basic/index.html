@@ -1,0 +1,58 @@
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Chat</title>
+	
+	<script src="libs.js"></script>
+	
+	<link href="style.css" rel="stylesheet" type="text/css">
+	
+</head>
+<body>
+	
+<!-- absolute -->
+
+<div class="alert" id="connecting">
+	<p>Connecting ...</p>
+</div>
+
+<div class="question" id="register" style="display: none;">
+	<input id="username" name="username" type="text" placeholder="Username">
+	<p class="message"></p>
+	<button class="submit">Submit</button>
+</div>
+
+<!-- end absolute -->
+
+<div id="wrapper">
+	
+	<div id="rooms">
+		
+		<ul class="rooms">
+		</ul>
+		
+		<div id="join">
+			<input id="room-name" name="room-name" type="text" placeholder="Room Name">
+			<button class="submit">Join</button>
+		</div>
+		
+	</div>
+	
+	<div id="messages">
+		
+		<div id="rooms">
+		</div>
+		
+		<div id="send">
+			<!-- new message -->
+		</div>
+		
+	</div>
+	
+	<div id="users">
+	</div>
+	
+</div>
+	
+</body>
+</html>

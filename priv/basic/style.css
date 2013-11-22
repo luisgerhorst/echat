@@ -1,0 +1,8 @@
+* {
+	margin: 0;
+	padding: 0;
+}
+
+#rooms .joined li.active {
+	background: #00f;
+}
