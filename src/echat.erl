@@ -5,16 +5,17 @@
 
 %% API.
 
-start() ->
-	ok = application:start(crypto),
-	ok = application:start(ranch),
-	ok = application:start(cowlib),
-	ok = application:start(cowboy),
-	ok = application:start(echat).
+start() -> [
+	application:start(crypto),
+	application:start(ranch),
+	application:start(cowlib),
+	application:start(cowboy),
+	application:start(echat)].
 
-stop() ->
-	ok = application:stop(echat),
-	ok = application:stop(mnesia),
-	ok = application:stop(cowboy),
-	ok = application:stop(ranch),
-	ok = application:stop(crypto).
+stop() -> [
+	application:stop(echat),
+	application:stop(mnesia),
+	application:stop(cowboy),
+	application:stop(cowlib),
+	application:stop(ranch),
+	application:stop(crypto)].
