@@ -3,7 +3,11 @@
 	<meta charset="utf-8">
 	<title>Chat</title>
 	
-	<script src="libs.js"></script>
+	<!--<script src="libs.js"></script>-->
+	<script src="/jquery-2.0.3.min.js"></script>
+	<script src="/bullet.js"></script>
+	<script src="/echat.js"></script>
+	<script src="moment.min.js"></script>
 	<script src="interface.js"></script>
 	
 	<link href="style.css" rel="stylesheet" type="text/css">
@@ -41,11 +45,14 @@
 	
 	<div id="messages">
 		
-		<div id="rooms">
+		<button id="load">Load more</button>
+		
+		<div class="rooms">
 		</div>
 		
 		<div id="send">
-			<!-- new message -->
+			<input id="new-message" name="content" type="text" placeholder="Message">
+			<button class="submit">Send</button>
 		</div>
 		
 	</div>

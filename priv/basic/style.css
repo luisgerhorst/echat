@@ -3,6 +3,27 @@
 	padding: 0;
 }
 
-#rooms .joined li.active {
+#rooms .rooms li {
+	background: #fff;
+}
+
+#rooms .rooms li.active {
 	background: #00f;
 }
+
+#messages .rooms ol {
+	display: none;
+}
+
+#messages .rooms ol.active {
+	display: block;
+}
+
+#users ul {
+	display: none;
+}
+
+#users ul.active {
+	display: block;
+}
+

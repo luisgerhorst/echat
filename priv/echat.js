@@ -220,8 +220,8 @@ function Chat(onReady) {
 			});
 			
 			onEvent[ref] = function (receivedMessages) {
-				Room.messages = Room.messages.concat(receivedMessages);
-				// console.log('load:', Room.messages, receivedMessages);
+				Room.messages = receivedMessages.concat(Room.messages);
+				console.log('load:', Room.messages, receivedMessages);
 				callback(receivedMessages, Room.messages);
 			};
 			
