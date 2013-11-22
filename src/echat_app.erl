@@ -14,7 +14,7 @@
 start(_StartType, []) ->
     Dispatch = cowboy_router:compile([
         {'_', [
-            {"/bullet", bullet_handler, [{handler, echat_stream_handler}]},
+            {"/bullet", bullet_handler, [{handler, echat_connection}]},
             {"/", cowboy_static, {priv_file, echat, "index.html"}},
             {"/[...]", cowboy_static, {priv_dir, echat, ""}}
         ]}
