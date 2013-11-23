@@ -17,14 +17,20 @@
 	
 <!-- absolute -->
 
-<div class="alert" id="connecting">
-	<p>Connecting ...</p>
-</div>
+<div class="overlay" id="setup">
 
-<div class="question" id="register" style="display: none;">
-	<input id="username" name="username" type="text" placeholder="Username">
-	<p class="message"></p>
-	<button class="submit">Submit</button>
+	<div class="box" id="connecting">
+		<p>Connecting ...</p>
+	</div>
+	
+	<div class="box" id="register" style="display: none;">
+		<input id="username" name="username" type="text" placeholder="Username">
+		<div class="button-wrapper">
+			<p class="message"></p>
+			<button class="submit">Submit</button>
+		</div>
+	</div>
+
 </div>
 
 <!-- end absolute -->

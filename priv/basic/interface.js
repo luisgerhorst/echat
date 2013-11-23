@@ -13,7 +13,7 @@ function register() {
 	
 	$('#register button.submit').click(function () {
 		
-		$('#register p.message').text('Logging in ...');
+		$('#register p.message').text('Submitting ...');
 		
 		var username = $('input#username').val();
 		
@@ -21,12 +21,16 @@ function register() {
 			if (username) return true;
 		}
 		
-		if (!valid(username)) $('#register p.message').text('Please enter a username.');
-		else {
+		if (!valid(username)) {
+			$('#username').addClass('error');
+			$('#register p.message').text('Please enter a valid username');
+		} else {
 			window.chat.username(username, function (accepted) {
-				if (!accepted) $('#register p.message').text('Username is already taken, please choose another one.');
-				else {
-					$('#register').hide();
+				if (!accepted) {
+					$('#username').addClass('error');
+					$('#register p.message').text('Username is already taken');
+				} else {
+					$('#setup').hide();
 					window.username = username;
 					join();
 					send();
@@ -50,6 +54,8 @@ function join() {
 		
 		if (!true) void(0); // #todo validate room name
 		else {
+			
+			$('#room-name').val('');
 			
 			function deactivateActive() {
 				$('#rooms .rooms .active').removeClass('active');
@@ -179,12 +185,17 @@ function send() {
 			
 			var room = window.activeRoom,
 			    username = window.username;
+			    
+			var unconfirmedID = Date.now();
 			
-			// #todo preview of message
+			$('#new-message').val('');
+			$('#messages .rooms .id-' + encodeURIComponent(room)).append('<li class="sent unconfirmed unconfirmed-id-' + unconfirmedID + '"><span class="name">' + username + '</span><span class="timestamp" data-timestamp="' + Date.now() + '"></span><span class="message">' + content + '</span></li>');
+			calcActiveTime();
 			
 			window.chat.room(room).send(content, function (timestamp) {
 				
-				$('#messages .rooms .id-' + encodeURIComponent(room)).append('<li><span class="name">' + username + '</span><span class="timestamp" data-timestamp="' + timestamp + '"></span><span class="message">' + content + '</span></li>');
+				$('#messages .rooms .id-' + encodeURIComponent(room) + ' .unconfirmed-id-' + unconfirmedID + ' span.timestamp').attr('data-timestamp', timestamp);
+				$('#messages .rooms .id-' + encodeURIComponent(room) + ' .unconfirmed-id-' + unconfirmedID).removeClass('unconfirmed-id-' + unconfirmedID).removeClass('unconfirmed');
 				calcActiveTime();
 				
 			});
@@ -236,11 +247,11 @@ function calcActiveTime() {
 	
 	console.log('Calc Active Time: called.');
 	
-	$('#messages .rooms ol.active li .timestamp').each(function () {
+	$('#messages .rooms ol.active li span.timestamp').each(function () {
 	
-		var timestamp = Math.round(parseFloat($(this).data('timestamp')));
+		var timestamp = Math.round(parseFloat($(this).attr('data-timestamp')));
 		var relative = moment(timestamp).fromNow();
-		$(this).text(relative);
+		$(this).html(relative);
 	
 	});
 	
