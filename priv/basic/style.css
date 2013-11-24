@@ -223,11 +223,10 @@ input::input-placeholder, input::-webkit-input-placeholder {
 	left: 0;
 	bottom: 0;
 	width: 200px;
-	height: 100%;
-	border-right: 1px solid rgb(192,192,192);
-	box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-	padding: 13px;
+	box-shadow: inset -1px 0 rgb(192,192,192);
 	box-sizing: border-box;
+	overflow-y: scroll;
+	overflow-x: hidden;
 }
 
 #messages {
@@ -237,7 +236,6 @@ input::input-placeholder, input::-webkit-input-placeholder {
 	right: 200px;
 	bottom: 0;
 	width: auto;
-	height: 100%;
 }
 
 #users {
@@ -246,8 +244,7 @@ input::input-placeholder, input::-webkit-input-placeholder {
 	right: 0;
 	bottom: 0;
 	width: 200px;
-	height: 100%;
-	background: #ccc;
+	border-left: 1px rgb(192,192,192) solid;
 }
 
 /* end global */
@@ -255,7 +252,110 @@ input::input-placeholder, input::-webkit-input-placeholder {
 /* rooms */
 
 #join {
+	width: 200px;
+	padding: 13px;
+}
+
+#rooms ul.rooms {
+	list-style: none;
+}
+
+/* #todo background color fallback & more vendor gradient prefixes */
+
+#rooms ul.rooms li { /* grey */
+	height: 36px;
+	background: linear-gradient(top, rgb(250,250,250) 0%, rgb(228,228,228) 100%);
+	background: -webkit-linear-gradient(top, rgb(250,250,250) 0%, rgb(232,232,232) 100%);
+	box-shadow: inset -1px 0 rgb(192,192,192), 0 -1px rgba(0,0,0,0.2), inset 0 1px rgba(255,255,255,0.44), inset 1px 0 rgba(255,255,255,0.24), inset -1px 0 rgba(255,255,255,0.24), inset 0 -1px rgba(255,255,255,0.24), 0 1px 2px rgba(0,0,0,0.08);
+}
+
+#rooms ul.rooms li.active { /* blue */
+	background: linear-gradient(top, rgb(95,175,230) 0%, rgb(50,130,215) 100%);
+	background: -webkit-linear-gradient(top, rgb(95,175,230) 0%, rgb(50,130,215) 100%);
+	box-shadow: inset -1px 0 rgba(0,0,0,0.1), inset 0 1px rgba(0,0,0,0.2);
+}
+
+#rooms ul.rooms li:first-child { /* grey */
+	box-shadow: inset -1px 0 rgb(192,192,192), 0 1px rgba(0,0,0,0.2);
+}
+
+#rooms ul.rooms li.active:first-child { /* blue */
+	box-shadow: inset -1px 0 rgba(0,0,0,0.1);
+}
+
+#rooms ul.rooms li:last-child { /* grey */
+	box-shadow: inset -1px 0 rgb(192,192,192), 0 -1px rgba(0,0,0,0.2), inset 0 -1px rgba(0,0,0,0.2);
+}
+
+#rooms ul.rooms li.active:last-child { /* blue */
+	box-shadow: inset -1px 0 rgba(0,0,0,0.1), inset 0 1px rgba(0,0,0,0.2), inset 0 -1px rgba(0,0,0,0.2);
+}
+
+#rooms ul.rooms li.active:last-child:first-child { /* blue */
+	box-shadow: inset -1px 0 rgba(0,0,0,0.1), inset 0 -1px rgba(0,0,0,0.2);
+}
+
+#rooms ul.rooms li span.name {
+	display: block;
+	float: left;
+	font-weight: normal;
+	line-height: 36px;
+	margin-left: 13px;
+	font-size: 15px;
+	font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+	color: rgba(0,0,0,0.50);
+	text-shadow: 0 1px #fff;
+}
+
+#rooms ul.rooms li.active span.name {
+	color: rgba(250,250,250,0.92);
+	text-shadow: 0 -1px rgb(58,138,223);
+}
+
+#rooms ul.rooms li button.remove {
+	display: none;
+}
+
+#rooms ul.rooms li:hover button.remove {
+	float: right;
+	display: block;
+	font-size: 11px;
+	line-height: 15px;
+	font-family: "Lucida Grande", "Lucida Sans Unicode", Geneva, sans-serif;
+	height: 15px;
+	padding: 0 5px 0 5px;
+	margin: 10px 10px 11px 0;
+	background: -webkit-linear-gradient(top, rgb(245,70,0) 0%, rgb(255,80,10) 100%);
+	box-shadow: inset 0 1px rgba(0,0,0,0.2), inset 1px 0 rgba(0,0,0,0.1), inset -1px 0 rgba(0,0,0,0.1), inset 0 -1px rgba(0,0,0,0.1), 0 1px 1px rgba(255,255,255,0.44);
+	color: #fff;
+	text-shadow: 0 1px rgba(0,0,0,0.2);
+	border-radius: 3px;
+}
+
+#rooms ul.rooms li.active:hover button.remove {
+	box-shadow: inset 0 1px rgba(0,0,0,0.2), inset 1px 0 rgba(0,0,0,0.2), inset -1px 0 rgba(0,0,0,0.2), inset 0 -1px rgba(0,0,0,0.1), 0 1px 1px rgba(255,255,255,0.24);
+}
+
+#room-name {
+	width: 174px;
+	box-sizing: border-box;
+}
+
+#load {
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	background: none;
+	color: rgb(110,110,110);
+	font: normal 13px "Lucida Grande", "Lucida Sans Unicode", Geneva, sans-serif;
+	line-height: 39px;
+	height: 39px;
+	text-decoration: underline;
+	padding: 0;
+	margin: 0;
 	width: 100%;
+	text-align: center;
 }
 
 #messages .rooms ol {
@@ -264,6 +364,51 @@ input::input-placeholder, input::-webkit-input-placeholder {
 
 #messages .rooms ol.active {
 	display: block;
+	list-style: none;
+	position: absolute;
+	top: 39px;
+	left: 0;
+	right: 0;
+	bottom: 0;
+}
+
+#messages div.scroll-wrapper {
+	position: absolute;
+	top: 0;
+	bottom: 53px;
+	right: 0;
+	left: 0;
+	overflow-y: scroll;
+}
+
+#send {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	width: 100%;
+	height: 52px;
+	background: #eee;
+	border-top: 1px rgb(192,192,192) solid;
+}
+
+#send div.input-wrapper {
+	position: absolute;
+	right: 73px;
+	left: 13px;
+	top: 13px;
+	bottom: 13px;
+}
+
+#send div.input-wrapper #new-message {
+	width: 100%;
+}
+
+#send button.submit {
+	position: absolute;
+	right: 13px;
+	top: 13px;
+	bottom: 13px;
 }
 
 #users ul {
@@ -272,5 +417,8 @@ input::input-placeholder, input::-webkit-input-placeholder {
 
 #users ul.active {
 	display: block;
+	list-style: none;
+	line-height: 21px;
+	padding: 13px;
 }
 

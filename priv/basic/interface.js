@@ -48,7 +48,12 @@ window.activeRoom = null;
 
 function join() {
 	
-	$('#join button.submit').click(function () {
+	$('#room-name').keydown(function (event) {
+		var keypressed = event.keyCode || event.which;
+		if (keypressed === 13) submit();
+	});
+	
+	function submit() {
 		
 		var room = $('#room-name').val();
 		
@@ -67,7 +72,7 @@ function join() {
 			
 			deactivateActive();
 			
-			$('#rooms .rooms').append('<li data-room-name="' + room + '" class="id-' + encodeURIComponent(room) + ' active"><span class="name">' + room + '</span><button class="remove">remove</button></li>');
+			$('#rooms .rooms').append('<li data-room-name="' + room + '" class="id-' + encodeURIComponent(room) + ' active"><span class="name">' + room + '</span><button class="remove">leave</button></li>');
 			$('#messages .rooms').append('<ol class="id-' + encodeURIComponent(room) + ' active"></ol>');
 			$('#users').append('<ul class="id-' + encodeURIComponent(room) + ' active"></ul>');
 			
@@ -106,7 +111,7 @@ function join() {
 				
 			});
 			
-			window.chat.join(room, 1, function (users, messages) {
+			window.chat.join(room, 15, function (users, messages) {
 				
 				(function (usernames) {
 					
@@ -166,7 +171,7 @@ function join() {
 			
 		}
 		
-	});
+	}
 	
 }
 
@@ -214,7 +219,7 @@ function load() {
 		
 		console.log('Load: Hanlder called.');
 		
-		window.chat.room(room).load(3, function (messages) {
+		window.chat.room(room).load(30, function (messages) {
 			
 			console.log('Load: Messages', messages);
 			

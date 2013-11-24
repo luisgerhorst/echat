@@ -43,21 +43,26 @@
 		</ul>
 		
 		<div id="join">
-			<input id="room-name" name="room-name" type="text" placeholder="Room Name">
-			<button class="submit">Join</button>
+			<input id="room-name" name="room-name" type="text" placeholder="Join Room">
 		</div>
 		
 	</div>
 	
 	<div id="messages">
 		
-		<button id="load">Load more</button>
+		<div class="scroll-wrapper">
 		
-		<div class="rooms">
+			<button id="load">Load older</button>
+			
+			<div class="rooms">
+			</div>
+			
 		</div>
 		
 		<div id="send">
-			<input id="new-message" name="content" type="text" placeholder="Message">
+			<div class="input-wrapper">
+				<input id="new-message" name="content" type="text" placeholder="Message">
+			</div>
 			<button class="submit">Send</button>
 		</div>
 		
