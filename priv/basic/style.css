@@ -6,6 +6,7 @@ body {
 		font: normal 13px "Lucida Grande", "Lucida Sans Unicode", Geneva, sans-serif;
 		color: rgb(110,110,110);
 		line-height: 18px;
+		background: #2D5072;
 }
 
 * {
@@ -212,13 +213,18 @@ input::input-placeholder, input::-webkit-input-placeholder {
 
 #wrapper {
 	z-index: 100;
-	width: 100%;
+	width: 70%;
 	height: 100%;
 	background: #fff;
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	left: 15%;
+	right: 15%;
 }
 
 #rooms {
-	position: fixed;
+	position: absolute;
 	top: 0;
 	left: 0;
 	bottom: 0;
@@ -230,7 +236,7 @@ input::input-placeholder, input::-webkit-input-placeholder {
 }
 
 #messages {
-	position: fixed;
+	position: absolute;
 	top: 0;
 	left: 200px;
 	right: 200px;
@@ -239,7 +245,7 @@ input::input-placeholder, input::-webkit-input-placeholder {
 }
 
 #users {
-	position: fixed;
+	position: absolute;
 	top: 0;
 	right: 0;
 	bottom: 0;
@@ -272,26 +278,26 @@ input::input-placeholder, input::-webkit-input-placeholder {
 #rooms ul.rooms li.active { /* blue */
 	background: linear-gradient(top, rgb(95,175,230) 0%, rgb(50,130,215) 100%);
 	background: -webkit-linear-gradient(top, rgb(95,175,230) 0%, rgb(50,130,215) 100%);
-	box-shadow: inset -1px 0 rgba(0,0,0,0.1), inset 0 1px rgba(0,0,0,0.2);
+	box-shadow: inset -1px 0 rgba(0,0,0,0.1), inset 0 1px rgba(0,0,0,0.3), inset 0 2px rgb(102,182,237);
 }
 
-#rooms ul.rooms li:first-child { /* grey */
+#rooms ul.rooms li:first-child { /* first grey */
 	box-shadow: inset -1px 0 rgb(192,192,192), 0 1px rgba(0,0,0,0.2);
 }
 
-#rooms ul.rooms li.active:first-child { /* blue */
-	box-shadow: inset -1px 0 rgba(0,0,0,0.1);
+#rooms ul.rooms li.active:first-child { /* first blue */
+	box-shadow: inset -1px 0 rgba(0,0,0,0.1), inset 0 1px rgb(102,182,237);
 }
 
-#rooms ul.rooms li:last-child { /* grey */
+#rooms ul.rooms li:last-child { /* grey last */
 	box-shadow: inset -1px 0 rgb(192,192,192), 0 -1px rgba(0,0,0,0.2), inset 0 -1px rgba(0,0,0,0.2);
 }
 
-#rooms ul.rooms li.active:last-child { /* blue */
-	box-shadow: inset -1px 0 rgba(0,0,0,0.1), inset 0 1px rgba(0,0,0,0.2), inset 0 -1px rgba(0,0,0,0.2);
+#rooms ul.rooms li.active:last-child { /* blue last */
+	box-shadow: inset -1px 0 rgba(0,0,0,0.1), inset 0 1px rgba(0,0,0,0.3), inset 0 -1px rgba(0,0,0,0.2), inset 0 2px rgb(102,182,237);
 }
 
-#rooms ul.rooms li.active:last-child:first-child { /* blue */
+#rooms ul.rooms li.active:last-child:first-child { /* single blue */
 	box-shadow: inset -1px 0 rgba(0,0,0,0.1), inset 0 -1px rgba(0,0,0,0.2);
 }
 
@@ -358,6 +364,15 @@ input::input-placeholder, input::-webkit-input-placeholder {
 	text-align: center;
 }
 
+#messages div.scroll-wrapper {
+	position: absolute;
+	top: 0;
+	bottom: 53px;
+	right: 0;
+	left: 0;
+	overflow-y: scroll;
+}
+
 #messages .rooms ol {
 	display: none;
 }
@@ -372,13 +387,46 @@ input::input-placeholder, input::-webkit-input-placeholder {
 	bottom: 0;
 }
 
-#messages div.scroll-wrapper {
-	position: absolute;
-	top: 0;
-	bottom: 53px;
-	right: 0;
-	left: 0;
-	overflow-y: scroll;
+#messages .rooms ol.active li {
+	display: block;
+	float: left;
+	width: 100%;
+}
+
+#messages .rooms ol.active li span.name {
+	display: block;
+	float: left;
+	color: rgb(153, 153, 155);
+	font-family: 'Lucida Grande', 'Helvetica Neue', sans-serif;
+	font-size: 12px;
+	line-height: 21px;
+	margin: 0 0 0 26px;
+}
+
+#messages .rooms ol.active li span.timestamp {
+	display: none;
+}
+
+#messages .rooms ol.active li:hover span.timestamp {
+	display: block;
+	float: right;
+	color: rgb(153, 153, 155);
+	font-family: 'Lucida Grande', 'Helvetica Neue', sans-serif;
+	font-size: 12px;
+	font-style: italic;
+	line-height: 21px;
+	margin: 0 26px 0 0;
+}
+
+#messages .rooms ol.active li span.message {
+	display: block;
+	float: left;
+	width: 100%;
+	padding: 0 0 26px 26px;
+	box-sizing: border-box;
+	color: rgb(90,90,90);
+	font: normal 13px "Lucida Grande", "Lucida Sans Unicode", Geneva, sans-serif;
+	line-height: 18px;
 }
 
 #send {
@@ -418,7 +466,13 @@ input::input-placeholder, input::-webkit-input-placeholder {
 #users ul.active {
 	display: block;
 	list-style: none;
-	line-height: 21px;
-	padding: 13px;
+	padding: 16px;
 }
 
+#users ul.active li {
+	color: rgb(90,90,90);
+	font-family: 'Lucida Grande', 'Helvetica Neue', sans-serif;
+	font-size: 12px;
+	line-height: 12px;
+	margin: 0 0 12px 0;
+}

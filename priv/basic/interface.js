@@ -111,7 +111,7 @@ function join() {
 				
 			});
 			
-			window.chat.join(room, 15, function (users, messages) {
+			window.chat.join(room, 20, function (users, messages) {
 				
 				(function (usernames) {
 					
@@ -155,7 +155,7 @@ function join() {
 				
 				switch (action) {
 					case 'join':
-						$('#users .id-' + encodeURIComponent(room)).append('<li class="id-' + encodeURIComponent(username) + '">' + username + '</li>');
+						$('#users ul.id-' + encodeURIComponent(room)).append('<li class="id-' + encodeURIComponent(username) + '">' + username + '</li>');
 						break;
 					case 'leave':
 						$('li.id-' + encodeURIComponent(username), '#users ul.id-' + encodeURIComponent(room)).remove();
@@ -219,7 +219,7 @@ function load() {
 		
 		console.log('Load: Hanlder called.');
 		
-		window.chat.room(room).load(30, function (messages) {
+		window.chat.room(room).load(50, function (messages) {
 			
 			console.log('Load: Messages', messages);
 			

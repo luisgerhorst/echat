@@ -5,6 +5,10 @@ Create your own web chat interface with a stable and fast Erlang backend and an 
 
 [![Build Status](https://travis-ci.org/luisgerhorst/echat.png?branch=master)](https://travis-ci.org/luisgerhorst/echat)
 
+# Example
+
+There's a example interface in `/basic/index.html` but it doesn't work in all browser and isn't very good at all.
+
 # Usage
 
 ## Start
