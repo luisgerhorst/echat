@@ -17,7 +17,7 @@ There's a example interface in `/basic/index.html` but it doesn't work in all br
 3. Open the erlang shell with `erl -pa ebin deps/*/ebin -env ERL_LIBS .`
 4. Start with `echat:start().` and stop with `echat:stop().`
 
-The app has a built-in file server that delivers all files in the `priv` directory, default port is `8222` (can be changed in `src/echat.app.src:8`, recompile after change).
+The app has a built-in file server that delivers all files in the `priv` directory, default port is `8222` (can be changed by setting the environment variable `port` before starting the app, e.g. `application:set_env(echat, port, MyPort)`).
 
 ## HTML
 
