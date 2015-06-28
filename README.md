@@ -115,5 +115,6 @@ If you need help send me a [mail](mailto:luis@luisgerhorst.de).
 
 # Todo
 
+- Because the room supervisor is not `simple_one_for_one`, the app will not work with many chat rooms. The solution would be to use an ETS table to lookup the room pids, but this would create the possibility of race conditions (a room decides to terminate after someone has looked up its pid but before that process has sent a message to it) and solving that problem would make the room manager a lot more complicated, so for now I'm just leaving it like this.
 - Easy install & run with *relx*
 - Example Interface
